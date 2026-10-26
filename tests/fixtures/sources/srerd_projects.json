@@ -1,0 +1,42 @@
+{
+  "_comment": "# SYNTHETIC - invented rows for tests, not real register data",
+  "data": [
+    {
+      "proId": 5501,
+      "projectNameEn": "Test Gardens",
+      "projectNameAr": "حدائق اختبار",
+      "areaNameEn": "Test Sharjah Area",
+      "areaNameAr": "منطقة اختبار",
+      "ownershipType": "Freehold"
+    },
+    {
+      "proId": 5502,
+      "projectNameEn": "Test Court",
+      "projectNameAr": "",
+      "areaNameEn": "Test Sharjah Area Two",
+      "areaNameAr": "",
+      "ownershipType": "Leasehold"
+    },
+    {
+      "proId": "SH-77",
+      "projectNameEn": "Test Bay",
+      "areaNameEn": "Test Sharjah Area"
+    },
+    {
+      "proId": null,
+      "projectNameEn": "Test Unkeyed",
+      "areaNameEn": "Test Sharjah Area"
+    },
+    {
+      "proId": 5503,
+      "projectNameEn": "",
+      "projectNameAr": "برج اختبار",
+      "areaNameEn": "Test Sharjah Area Two"
+    },
+    {
+      "proId": 5504,
+      "projectNameEn": "Test Plaza",
+      "areaNameEn": "1200"
+    }
+  ]
+}

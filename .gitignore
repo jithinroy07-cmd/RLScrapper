@@ -1,0 +1,65 @@
+# Secrets and credentials - never commit. Names only live in .env.example.
+.env
+.env.*
+!.env.example
+*.env
+.envrc
+service_account*.json
+*service_account*.json
+*service-account*.json
+*.json.json
+credentials*.json
+client_secret*.json
+token*.json
+*.pem
+*.p12
+*.pfx
+*.key
+id_rsa*
+id_ed25519*
+.secrets/
+# A key file is usually dropped at the repo root under whatever name the owner picked
+# (GCP_SERVICE_ACCOUNT_FILE accepts any). No JSON file belongs at the root.
+/*.json
+
+# Local virtualenv
+.venv/
+venv/
+env/
+
+# Local geocode cache (the Google Sheet is the source of truth for coordinates)
+src/data/geocode_cache.json
+
+# Sheet backups written by scripts/dedupe_sheet.py (contain live sheet data)
+backups/
+
+# Generated each run
+site/pins.geojson
+scraped_projects_latest.json
+# Temporary files the atomic writers leave behind if the process dies mid-write
+# (site/pins.geojson.<random>.tmp, scraped_projects_latest.json.<random>.tmp,
+# geocode_cache.json.<pid>.tmp). They hold live data, so they must never be committed.
+*.tmp
+*.log
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+.pytest_cache/
+.coverage
+.coverage.*
+htmlcov/
+.mypy_cache/
+.ruff_cache/
+build/
+dist/
+*.egg-info/
+
+# IDE / OS
+.vscode/
+.idea/
+*.swp
+Thumbs.db
+Desktop.ini
+.DS_Store

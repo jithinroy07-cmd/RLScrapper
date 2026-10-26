@@ -1,0 +1,62 @@
+{
+  "_note": "Starter list of place-name spellings, to be extended as geocoder misses are found. Add a name only when it is certainly a spelling variant, an abbreviation or a documented rename of the SAME place; never add a neighbouring or merely related place, and never invent a community. Areas are grouped per emirate because some names (Al Nahda) exist in both and must not be merged across the border. 'tokens' maps one variant word to its canonical spelling and is applied to place names only, never to project names. Keys are compared after lower-casing, removing diacritics and punctuation.",
+  "version": 1,
+  "tokens": {
+    "jumeira": "jumeirah",
+    "el": "al",
+    "muweilah": "muwaileh",
+    "muwailih": "muwaileh",
+    "muweileh": "muwaileh",
+    "muwaylih": "muwaileh",
+    "mariam": "maryam",
+    "shaikh": "sheikh",
+    "shaykh": "sheikh",
+    "mohammad": "mohammed",
+    "mohamed": "mohammed",
+    "muhammad": "mohammed",
+    "harbor": "harbour"
+  },
+  "areas": {
+    "Dubai": {
+      "Jumeirah Village Circle": ["JVC"],
+      "Jumeirah Village Triangle": ["JVT"],
+      "Jumeirah Lakes Towers": ["JLT"],
+      "Jumeirah Beach Residence": ["JBR"],
+      "Jumeirah Golf Estates": [],
+      "Palm Jumeirah": ["The Palm Jumeirah"],
+      "Business Bay": [],
+      "Downtown Dubai": [],
+      "Dubai Marina": [],
+      "Dubai Hills Estate": ["Dubai Hills", "Dubai Hills Estates"],
+      "Dubai Creek Harbour": ["Creek Harbour"],
+      "Dubai South": ["Dubai World Central", "DWC"],
+      "Dubai Islands": ["Deira Islands"],
+      "Dubai Silicon Oasis": ["Silicon Oasis", "DSO"],
+      "Dubai Investments Park": ["Dubai Investment Park", "DIP"],
+      "Dubai Production City": ["International Media Production Zone", "IMPZ"],
+      "Dubai Sports City": ["Sports City"],
+      "Dubai Motor City": ["Motor City"],
+      "Dubai Studio City": ["Studio City"],
+      "Dubai International Financial Centre": ["DIFC"],
+      "Mohammed Bin Rashid City": ["MBR City", "Mohammed Bin Rashid Al Maktoum City"],
+      "The Sustainable City": ["Dubai Sustainable City", "Sustainable City"],
+      "Mirdif": ["Mirdiff"],
+      "Al Nahda": ["Al Nahdah"]
+    },
+    "Sharjah": {
+      "Aljada": ["Al Jada"],
+      "Masaar": [],
+      "Al Mamsha": ["Almamsha"],
+      "Al Zahia": ["Alzahia"],
+      "Tilal City": ["Tilal"],
+      "Al Khan": [],
+      "Al Majaz": ["Almajaz"],
+      "Muwaileh": [],
+      "Al Nahda": ["Al Nahdah"],
+      "Maryam Island": [],
+      "Sharjah Waterfront City": ["Waterfront City", "Ajmal Makan City", "Ajmal Makan"],
+      "Sharjah Sustainable City": ["The Sustainable City Sharjah", "Sustainable City Sharjah"],
+      "Khalid Bin Sultan City": []
+    }
+  }
+}

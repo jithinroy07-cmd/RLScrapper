@@ -1,0 +1,10 @@
+gspread>=6.1.4
+google-auth>=2.49.0
+google-genai>=2.3.0
+pydantic>=2.10.0
+python-dotenv>=1.2.2
+requests>=2.33.0
+shapely>=2.1
+tzdata>=2024.1
+pyyaml>=6.0.1
+pytest>=9.0.3

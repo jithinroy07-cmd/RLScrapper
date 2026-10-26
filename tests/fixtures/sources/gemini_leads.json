@@ -1,0 +1,45 @@
+{
+  "_comment": "# SYNTHETIC - invented leads for tests, not real announcements",
+  "candidates": [
+    {
+      "project_name": "Test Launch One",
+      "developer": "Example Developer LLC",
+      "emirate": "Dubai",
+      "area": "Test Area One",
+      "claim": "Example Developer LLC announced Test Launch One.",
+      "source_url": "https://news.example.com/test-launch-one"
+    },
+    {
+      "project_name": "Test Launch Two",
+      "developer": "",
+      "emirate": "Sharjah",
+      "area": "",
+      "claim": "Test Launch Two was released for sale.",
+      "source_url": "https://www.example.org/articles/two"
+    },
+    {
+      "project_name": "Test Launch Three",
+      "developer": "Example Developer Two LLC",
+      "emirate": "Abu Dhabi",
+      "area": "Test Area Three",
+      "claim": "Outside the two emirates in scope.",
+      "source_url": "https://news.example.com/three"
+    },
+    {
+      "project_name": "Test Launch Four",
+      "developer": "Example Developer LLC",
+      "emirate": "Dubai",
+      "area": "Test Area One",
+      "claim": "Cites a site the search never retrieved.",
+      "source_url": "https://unrelated.example.net/four"
+    },
+    {
+      "project_name": "Test Launch Five",
+      "developer": "Example Developer LLC",
+      "emirate": "Dubai",
+      "area": "Test Area One",
+      "claim": "Has no source address at all.",
+      "source_url": ""
+    }
+  ]
+}

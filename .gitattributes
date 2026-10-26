@@ -1,0 +1,32 @@
+# Line endings. The repository stores LF; Windows checkouts with core.autocrlf=true
+# convert on the way in and out, and Linux (the CI runner) never sees a CR. Shell
+# and YAML files break on a CR, so they are pinned to LF in the working tree too.
+* text=auto eol=lf
+
+*.py text eol=lf
+*.md text eol=lf
+*.txt text eol=lf
+*.ini text eol=lf
+*.html text eol=lf
+*.css text eol=lf
+*.js text eol=lf
+*.json text eol=lf
+*.geojson text eol=lf linguist-generated
+*.csv text eol=lf
+*.sh text eol=lf
+*.yml text eol=lf
+*.yaml text eol=lf
+.gitignore text eol=lf
+.gitattributes text eol=lf
+.env.example text eol=lf
+
+# Binary files: never converted, never diffed as text.
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.gif binary
+*.webp binary
+*.ico binary
+*.woff binary
+*.woff2 binary
+*.pdf binary

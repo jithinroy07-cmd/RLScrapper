@@ -1,0 +1,41 @@
+{
+  "_comment": "# SYNTHETIC - invented rows for tests, not real register data",
+  "total": 6,
+  "last_updated": "2026-10-20",
+  "data": [
+    {
+      "PROJECT_NUMBER": 1001,
+      "PROJECT_NAME": "Test Residences A",
+      "DEVELOPER_NAME": "Example Developer LLC",
+      "MASTER_DEVELOPER_NAME": "Example Master Developer LLC",
+      "MASTER_PROJECT_EN": "Test Master Community",
+      "AREA_NAME_EN": "Test Area One",
+      "AREA_NAME_AR": "منطقة اختبار",
+      "ZONE_EN": "Test Zone",
+      "PROJECT_STATUS": "ACTIVE",
+      "PERCENT_COMPLETED": 45.5,
+      "PROJECT_START_DATE": "01-03-2024",
+      "PROJECT_END_DATE": "30-06-2027",
+      "ESCROW_AGENT_NAME": "Example Escrow Bank",
+      "NO_OF_UNITS": 320,
+      "NO_OF_BUILDINGS": 2,
+      "NO_OF_VILLAS": 0
+    },
+    {
+      "PROJECT_NUMBER": 1002,
+      "PROJECT_NAME": "Test Residences B",
+      "DEVELOPER_NAME": "Example Developer LLC",
+      "AREA_NAME_EN": "Test Area One",
+      "PROJECT_STATUS": "ACTIVE",
+      "PERCENT_COMPLETED": "12",
+      "NO_OF_UNITS": "1,250"
+    },
+    {
+      "PROJECT_NUMBER": "1003",
+      "PROJECT_NAME": "مشروع اختبار",
+      "DEVELOPER_NAME": "Example Developer LLC",
+      "AREA_NAME_EN": "Test Area Two",
+      "PROJECT_STATUS": "FINISHED"
+    }
+  ]
+}

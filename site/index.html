@@ -1,0 +1,1124 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<!--
+  The policy comes first so it covers every resource below it. The two sha256 values
+  are the hashes of the page's one inline stylesheet and one inline script (an inline
+  block is allowed only if it is byte-for-byte the one hashed here, so injected markup
+  cannot run). If you edit either block, tests/test_site_html.py prints the new hash
+  to paste in.
+  img-src has data: because Leaflet swaps cancelled tiles for a one-pixel data image.
+-->
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'self' https://cdnjs.cloudflare.com 'sha256-OE8cLOx7t+UBBRwKoucWRlOFkL/ekRLW3vZhQu9971c='; style-src 'self' https://cdnjs.cloudflare.com 'sha256-AjNdKm962lR+1hWNcBA4e6LyJJ1WMRl4N+hSzTL9Lpc='; img-src 'self' data: https://tile.openstreetmap.org; connect-src 'self'; base-uri 'none'; form-action 'none'; object-src 'none'">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>UAE Projects Map</title>
+<link rel="icon" href="data:,">
+<meta name="description" content="Dubai and Sharjah real-estate projects from the registries, with a visible location precision on every pin. Refreshed by the tracker after every run.">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css" integrity="sha384-c6Rcwz4e4CITMbu/NBmnNS8yN2sC3cUElMEMfP3vqqKFp7GOYaaBBCqmaWBjmkjb" crossorigin="anonymous">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet.markercluster/1.5.3/MarkerCluster.min.css" integrity="sha384-uIZNAcoEHVWMk8LrCSX95DJk6FQzH6zG00LQC9BykRY1UKKpkDzDhbDLYQ1Ho3mI" crossorigin="anonymous">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet.markercluster/1.5.3/MarkerCluster.Default.min.css" integrity="sha384-NyCa0nBOjmCqS9HwLKpE7yqy2HVG6PN/cDyAAIdPijDlUH6jCfqX6ydzXFTA/L/l" crossorigin="anonymous">
+<style>
+  :root {
+    --ground: #F2F4F5;
+    --surface: #FFFFFF;
+    --surface-2: #E8ECEE;
+    --ink: #17232B;
+    --muted: #5A6B74;
+    --line: #D5DCDF;
+    --accent: #0B6A8F;
+    --accent-ink: #FFFFFF;
+    --focus: #1D5FB8;
+    --dubai: #0B7A6E;
+    --sharjah: #B2530E;
+    --marker-edge: #FFFFFF;
+    --warn-bg: #FFF3D6;
+    --warn-ink: #5C3B00;
+    --error-bg: #FBE3E1;
+    --error-ink: #6B1410;
+    --radius-fill: rgba(11, 106, 143, 0.10);
+    --shadow: 0 1px 2px rgba(23, 35, 43, 0.08), 0 8px 24px rgba(23, 35, 43, 0.08);
+    --tile-filter: none;
+    color-scheme: light;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --ground: #0F1619; --surface: #16222A; --surface-2: #1E2C34;
+      --ink: #E4EAEC; --muted: #9AA9B1; --line: #2A3A42;
+      --accent: #5BB6DA; --accent-ink: #08202B; --focus: #7DA9EC;
+      --dubai: #3FC0AE; --sharjah: #E9A064; --marker-edge: #16222A;
+      --warn-bg: #3A2D0C; --warn-ink: #F4DDA6; --error-bg: #3D1B19; --error-ink: #F6C9C5;
+      --radius-fill: rgba(91, 182, 218, 0.16);
+      --shadow: 0 1px 2px rgba(0,0,0,.4), 0 8px 24px rgba(0,0,0,.4);
+      --tile-filter: invert(1) hue-rotate(180deg) brightness(.92) contrast(.88) saturate(.7);
+      color-scheme: dark;
+    }
+  }
+  :root[data-theme="dark"] {
+    --ground: #0F1619; --surface: #16222A; --surface-2: #1E2C34;
+    --ink: #E4EAEC; --muted: #9AA9B1; --line: #2A3A42;
+    --accent: #5BB6DA; --accent-ink: #08202B; --focus: #7DA9EC;
+    --dubai: #3FC0AE; --sharjah: #E9A064; --marker-edge: #16222A;
+    --warn-bg: #3A2D0C; --warn-ink: #F4DDA6; --error-bg: #3D1B19; --error-ink: #F6C9C5;
+    --radius-fill: rgba(91, 182, 218, 0.16);
+    --shadow: 0 1px 2px rgba(0,0,0,.4), 0 8px 24px rgba(0,0,0,.4);
+    --tile-filter: invert(1) hue-rotate(180deg) brightness(.92) contrast(.88) saturate(.7);
+    color-scheme: dark;
+  }
+
+  * { box-sizing: border-box; }
+  [hidden] { display: none !important; }
+  html, body { height: 100%; margin: 0; }
+  body {
+    background: var(--ground); color: var(--ink);
+    font: 14px/1.45 system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, "Noto Sans", "Noto Naskh Arabic", sans-serif;
+    display: flex; flex-direction: column; overflow: hidden;
+  }
+  .mono { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-variant-numeric: tabular-nums; }
+  button, input, select { font: inherit; color: inherit; }
+  :focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
+
+  .c-dubai { --c: var(--dubai); }
+  .c-sharjah { --c: var(--sharjah); }
+  .sym {
+    display: inline-block; flex: none; width: 12px; height: 12px; border-radius: 50%;
+    border: 2px solid var(--c, var(--muted)); background: var(--c, var(--muted)); vertical-align: -1px;
+  }
+  .sym.hollow { background: transparent; }
+
+  /* ---- header ---- */
+  .top {
+    display: flex; align-items: center; gap: 12px 20px; flex-wrap: wrap;
+    padding: 10px 16px; padding-top: calc(10px + env(safe-area-inset-top, 0px));
+    background: var(--surface); border-bottom: 1px solid var(--line);
+  }
+  .brand { display: flex; align-items: baseline; gap: 10px; margin-right: auto; }
+  .brand h1 { font-size: 16px; font-weight: 650; margin: 0; letter-spacing: -0.01em; text-wrap: balance; }
+  .brand .sub { color: var(--muted); font-size: 12px; }
+  .stats { display: flex; gap: 6px 18px; flex-wrap: wrap; color: var(--muted); font-size: 12px; }
+  .stats .grp { display: inline-flex; gap: 4px 10px; flex-wrap: wrap; align-items: baseline; }
+  .stats .grp > .lbl { text-transform: uppercase; letter-spacing: 0.06em; font-size: 10.5px; }
+  .stats b { color: var(--ink); font-weight: 600; }
+  .btn {
+    border: 1px solid var(--line); background: var(--surface); border-radius: 6px;
+    padding: 7px 11px; cursor: pointer; font-size: 13px; line-height: 1;
+  }
+  .btn:hover { background: var(--surface-2); }
+  .btn[disabled] { opacity: .5; cursor: default; }
+  .btn.active { background: var(--accent); color: var(--accent-ink); border-color: var(--accent); }
+  .notice { padding: 10px 16px; font-size: 13px; border-bottom: 1px solid var(--line); background: var(--warn-bg); color: var(--warn-ink); }
+  .notice.error { background: var(--error-bg); color: var(--error-ink); }
+  .notice.info { background: var(--surface-2); color: var(--ink); }
+  .notice p { margin: 0; }
+  .notice p + p { margin-top: 4px; }
+
+  /* ---- body ---- */
+  .wrap { flex: 1; display: flex; min-height: 0; }
+  .side {
+    width: 380px; flex: none; display: flex; flex-direction: column; min-height: 0; overflow: auto;
+    background: var(--surface); border-right: 1px solid var(--line);
+  }
+  .side section { padding: 12px 16px; border-bottom: 1px solid var(--line); }
+  .lbl { display: block; font-size: 11px; text-transform: uppercase; letter-spacing: 0.06em; color: var(--muted); margin-bottom: 6px; }
+  .search, select.sel { width: 100%; padding: 8px 10px; border: 1px solid var(--line); border-radius: 6px; background: var(--ground); }
+  .chips { display: flex; flex-wrap: wrap; gap: 6px; }
+  .chip {
+    display: inline-flex; align-items: center; gap: 6px; padding: 5px 10px; border-radius: 999px;
+    border: 1px solid var(--line); background: var(--surface); cursor: pointer; font-size: 12px;
+  }
+  .chip:hover { background: var(--surface-2); }
+  .chip[aria-pressed="true"] { background: var(--accent); color: var(--accent-ink); border-color: var(--accent); }
+  .chip.emirate[aria-pressed="true"] { background: var(--surface); color: var(--ink); border-color: var(--c); box-shadow: inset 0 0 0 1px var(--c); }
+  .chip.emirate[aria-pressed="false"] { opacity: .7; }
+  .row2 { display: flex; align-items: center; gap: 10px; }
+  .row2 input[type=range] { flex: 1; min-width: 0; accent-color: var(--accent); }
+  .hint { color: var(--muted); font-size: 12px; margin: 6px 0 0; }
+  .hint.warn { color: var(--warn-ink); background: var(--warn-bg); padding: 6px 8px; border-radius: 6px; }
+  .cov { color: var(--muted); font-size: 11.5px; margin: 6px 0 0; }
+  .legend { display: flex; flex-wrap: wrap; gap: 6px 14px; font-size: 12px; color: var(--muted); align-items: center; }
+  .legend span { display: inline-flex; gap: 6px; align-items: center; }
+  .results { flex: 1; min-height: 120px; }
+  .results header { padding: 8px 16px; font-size: 12px; color: var(--muted); position: sticky; top: 0; background: var(--surface); border-bottom: 1px solid var(--line); z-index: 1; }
+  .results header .warn { color: var(--warn-ink); background: var(--warn-bg); border-radius: 4px; padding: 0 5px; margin-left: 4px; white-space: nowrap; }
+  .row {
+    display: grid; grid-template-columns: 14px 1fr auto; gap: 10px; align-items: start; width: 100%; text-align: start;
+    padding: 10px 16px; border: 0; border-bottom: 1px solid var(--line); background: transparent; cursor: pointer;
+  }
+  .row:hover { background: var(--surface-2); }
+  .row .sym { margin-top: 4px; }
+  .row .main { display: flex; flex-direction: column; min-width: 0; }
+  .row .name { font-weight: 500; unicode-bidi: plaintext; overflow-wrap: anywhere; }
+  .row .meta { color: var(--muted); font-size: 12px; overflow-wrap: anywhere; }
+  .row .aside { color: var(--muted); font-size: 12px; white-space: nowrap; }
+  .empty { padding: 20px 16px; color: var(--muted); }
+  .credits { padding: 10px 16px; font-size: 11px; color: var(--muted); }
+
+  #map { flex: 1; min-width: 0; background: var(--ground); }
+  .leaflet-tile { filter: var(--tile-filter); }
+  .leaflet-container { font: inherit; }
+  .leaflet-popup-content-wrapper, .leaflet-popup-tip { background: var(--surface); color: var(--ink); box-shadow: var(--shadow); }
+  .leaflet-popup-content { margin: 12px 14px; font-size: 13px; line-height: 1.4; }
+  .pop h3 { margin: 0 0 2px; font-size: 14px; font-weight: 650; overflow-wrap: anywhere; }
+  .pop .ar { font-size: 14px; margin-bottom: 2px; unicode-bidi: plaintext; text-align: start; }
+  .pop .meta { color: var(--muted); font-size: 12px; margin-bottom: 6px; }
+  .pop .fact { font-size: 12.5px; margin: 1px 0; overflow-wrap: anywhere; }
+  .pop .fact .k { color: var(--muted); margin-inline-end: 4px; }
+  .pop .prec { margin: 8px 0 0; padding: 4px 8px; border-radius: 6px; font-size: 12px; background: var(--surface-2); }
+  .pop .prec.approx { background: var(--warn-bg); color: var(--warn-ink); }
+  .pop .lst { margin-top: 8px; padding-top: 8px; border-top: 1px solid var(--line); }
+  .pop .src { color: var(--muted); font-size: 12px; margin-top: 4px; }
+  .pop a { color: var(--accent); font-weight: 500; }
+  .pop .reg { color: var(--muted); font-size: 11.5px; margin-top: 8px; overflow-wrap: anywhere; }
+  /* Leaflet's own sheet says .leaflet-container .leaflet-control-attribution and .leaflet-bar a:focus, which a
+     plainer selector loses to: in dark mode that left a pale attribution strip and a pale focused zoom button. */
+  .leaflet-container .leaflet-control-attribution { background: var(--surface); color: var(--muted); }
+  .leaflet-container .leaflet-control-attribution a { color: var(--accent); }
+  .leaflet-bar a { background: var(--surface); color: var(--ink); border-bottom-color: var(--line); }
+  .leaflet-bar a:hover, .leaflet-bar a:focus { background: var(--surface-2); color: var(--ink); }
+  .marker-cluster div { background: var(--accent); color: var(--accent-ink); font-weight: 600; }
+  .marker-cluster { background: var(--radius-fill); }
+  .centre-pin { background: var(--accent); border: 3px solid var(--marker-edge); border-radius: 50%; box-shadow: var(--shadow); }
+  .picking .leaflet-container { cursor: crosshair; }
+  .toggle-side { display: none; }
+
+  @media (max-width: 760px) {
+    .wrap { flex-direction: column; }
+    .side { width: 100%; max-height: 46vh; border-right: 0; border-top: 1px solid var(--line); order: 2; }
+    .side.collapsed { max-height: 0; overflow: hidden; border: 0; visibility: hidden; }
+    #map { order: 1; min-height: 40vh; }
+    .toggle-side { display: inline-block; }
+    .stats { width: 100%; }
+  }
+  @media (prefers-reduced-motion: reduce) { * { transition: none !important; animation: none !important; } }
+</style>
+</head>
+<body>
+
+<div class="top">
+  <div class="brand">
+    <h1>UAE Projects Map</h1>
+    <span class="sub">Dubai and Sharjah</span>
+  </div>
+  <div class="stats" id="stats" aria-live="polite">Loading pins&hellip;</div>
+  <button class="btn toggle-side" id="toggleSide" type="button" aria-expanded="true" aria-controls="side">Filters &amp; list</button>
+  <button class="btn" id="reload" type="button">Refresh</button>
+</div>
+<div class="notice" id="notice" hidden></div>
+
+<div class="wrap">
+  <aside class="side" id="side" aria-label="Filters and results">
+    <section>
+      <label class="lbl" for="q">Search</label>
+      <input class="search" id="q" type="search" placeholder="Project, developer or registry number" autocomplete="off">
+    </section>
+    <section>
+      <span class="lbl" id="emirateLabel">Emirate</span>
+      <div class="chips" id="emirateChips" role="group" aria-labelledby="emirateLabel"></div>
+    </section>
+    <section>
+      <label class="lbl" for="status">Status</label>
+      <select class="sel" id="status"><option value="">Any status</option></select>
+      <p class="cov" id="statusCov"></p>
+    </section>
+    <section>
+      <span class="lbl" id="typeLabel">Property type</span>
+      <div class="chips" id="typeChips" role="group" aria-labelledby="typeLabel"></div>
+      <p class="cov" id="typeCov"></p>
+    </section>
+    <section>
+      <span class="lbl" id="bedLabel">Bedrooms</span>
+      <div class="chips" id="bedChips" role="group" aria-labelledby="bedLabel"></div>
+      <p class="cov" id="bedCov"></p>
+    </section>
+    <section>
+      <span class="lbl">Price (AED, log scale)</span>
+      <div class="row2">
+        <input type="range" id="priceLo" min="0" max="1000" step="1" value="0" aria-label="Minimum price">
+      </div>
+      <div class="row2">
+        <input type="range" id="priceHi" min="0" max="1000" step="1" value="1000" aria-label="Maximum price">
+      </div>
+      <p class="hint mono" id="priceLabel"></p>
+      <p class="cov" id="priceCov"></p>
+    </section>
+    <section>
+      <span class="lbl">Within a radius</span>
+      <div class="row2">
+        <button class="btn" id="pick" type="button">Pick a centre on the map</button>
+        <button class="btn" id="clearRadius" type="button" hidden>Clear</button>
+      </div>
+      <div class="row2">
+        <input type="range" id="radius" min="0.5" max="25" step="0.5" value="5" aria-label="Radius in kilometres">
+        <span class="mono" id="radiusLabel">5.0 km</span>
+      </div>
+      <p class="hint">Radius search uses exact pins only. Approximate pins are community or area centroids, not real positions, so they are left out.</p>
+      <p class="hint warn" id="radiusNote" hidden></p>
+    </section>
+    <section>
+      <span class="lbl">Legend</span>
+      <div class="legend">
+        <span class="c-dubai"><i class="sym"></i> Dubai</span>
+        <span class="c-sharjah"><i class="sym"></i> Sharjah</span>
+        <span><i class="sym"></i> Exact location</span>
+        <span><i class="sym hollow"></i> Approximate (centroid)</span>
+      </div>
+      <p class="cov"><button class="btn" id="resetFilters" type="button">Reset filters</button></p>
+    </section>
+    <div class="results" id="results">
+      <header id="resultsHeader">&mdash;</header>
+      <div id="list"></div>
+    </div>
+    <div class="credits" id="credits"></div>
+  </aside>
+  <div id="map" role="application" aria-label="Map of Dubai and Sharjah projects. The list in the side panel has the same projects."></div>
+</div>
+<noscript><div class="notice error">This map needs JavaScript. Without it nothing can be drawn.</div></noscript>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js" integrity="sha384-NElt3Op+9NBMCYaef5HxeJmU4Xeard/Lku8ek6hoPTvYkQPh3zLIrJP7KiRocsxO" crossorigin="anonymous"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet.markercluster/1.5.3/leaflet.markercluster.min.js" integrity="sha384-SIh+qcEBNMda8tT+rx66aCBuWtVYMVzRABqhK4eeQh4pjDHoRdVx8nYU4LQ5eGzI" crossorigin="anonymous"></script>
+<script>
+(function () {
+  'use strict';
+
+  /* === PURE-BEGIN (no DOM, no Leaflet: tests/test_site_html.py runs this block under node) === */
+  var SCHEMA = 1;                       // scripts/export_map_pins.py SCHEMA_VERSION
+  // The same box as src.emirates.UNION_BBOX (a test keeps them equal): a coarse
+  // sanity gate that drops swapped or foreign coordinates. It never decides an emirate.
+  var UAE_BBOX = { minLat: 24.62, maxLat: 25.70, minLng: 53.98, maxLng: 56.60 };
+  var EMIRATES = ['Dubai', 'Sharjah'];
+  var PRECISIONS = ['exact', 'community', 'area', 'unknown'];
+  var TYPE_ORDER = ['Apartment', 'Villa', 'Townhouse', 'Penthouse', 'Duplex', 'Hotel Apartment', 'Plot', 'Commercial', 'Mixed Use'];
+  var BED_CHIPS = [
+    { value: 0, label: 'Studio' }, { value: 1, label: '1' }, { value: 2, label: '2' },
+    { value: 3, label: '3' }, { value: 4, label: '4' }, { value: 5, label: '5+' }
+  ];
+  var PRICE_STEPS = 1000;               // the price sliders run 0..1000 on a log scale
+  var MAX_BEDROOMS = 20;                // the ceilings below equal the exporter's (a test keeps them equal)
+  var MAX_PRICE_AED = 1e10;
+  var MAX_PRICE_PER_SQFT = 1e5;
+  var MAX_UNITS = 1e9;
+  var PRECISION_NOTES = {
+    exact: 'Exact location',
+    community: 'Approximate location (community centroid)',
+    area: 'Approximate location (area centroid)',
+    unknown: 'Approximate location (precision not recorded)'
+  };
+
+  // Escape for the one place text could ever reach markup. The page builds its DOM
+  // with textContent, so nothing here currently needs it; it stays so that anyone
+  // adding innerHTML has to route every value through it (a test enforces that).
+  function escapeHtml(value) {
+    return String(value == null ? '' : value).replace(/[&<>"'`]/g, function (c) {
+      return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;', '`': '&#96;' }[c];
+    });
+  }
+
+  // The only way a data value becomes a link target. Returns the parsed, normalised
+  // href, or null. Rejects every scheme but http(s), credentials in the URL, and any
+  // whitespace or control character (URL parsing silently strips tabs and newlines
+  // from inside a scheme, so "java\tscript:" must be refused before parsing).
+  function safeHttpUrl(value) {
+    if (typeof value !== 'string' || value === '' || value.length > 2000) return null;
+    if (/[\s\u0000-\u001f\u007f-\u009f]/.test(value)) return null;
+    var url;
+    try { url = new URL(value); } catch (e) { return null; }
+    if (url.protocol !== 'http:' && url.protocol !== 'https:') return null;
+    if (url.username || url.password || !url.hostname) return null;
+    return url.href;
+  }
+
+  function hostnameOf(href) {
+    try { return new URL(href).hostname.replace(/^www\./, '') || 'source'; } catch (e) { return 'source'; }
+  }
+
+  // ---- price slider: position 0..1000 <-> AED on a log scale ----
+  function posToPrice(pos, min, max) {
+    if (!(min > 0) || !(max >= min) || !isFinite(max)) return null;
+    var p = Math.round(Number(pos));
+    if (!isFinite(p)) return null;
+    if (p <= 0) return min;
+    if (p >= PRICE_STEPS) return max;
+    return min * Math.pow(max / min, p / PRICE_STEPS);
+  }
+  function priceToPos(price, min, max) {
+    if (!(min > 0) || !(max > min) || !isFinite(max)) return null;
+    var v = Number(price);
+    if (!isFinite(v) || v <= 0) return null;
+    if (v <= min) return 0;
+    if (v >= max) return PRICE_STEPS;
+    return Math.round(PRICE_STEPS * Math.log(v / min) / Math.log(max / min));
+  }
+
+  // ---- number and text formatting ----
+  function groupDigits(n) {
+    if (typeof n !== 'number' || !isFinite(n)) return '';
+    return String(Math.round(n)).replace(/\B(?=(\d{3})+(?!\d))/g, ',');
+  }
+  function trimNumber(x, decimals) {
+    var s = x.toFixed(decimals);
+    return s.indexOf('.') >= 0 ? s.replace(/\.?0+$/, '') : s;
+  }
+  function formatAedFull(n) { return typeof n === 'number' && isFinite(n) ? 'AED ' + groupDigits(n) : ''; }
+  function formatAed(n) {
+    if (typeof n !== 'number' || !isFinite(n) || n < 0) return '';
+    var units = [[1e9, 'B', 2], [1e6, 'M', 2], [1e3, 'K', 1]];
+    for (var i = 0; i < units.length; i++) {
+      if (n >= units[i][0]) {
+        var text = trimNumber(n / units[i][0], units[i][2]);
+        if (i > 0 && parseFloat(text) >= 1000) {   // 999,999 rounds to "1000K": say 1M instead
+          i--;
+          text = trimNumber(n / units[i][0], units[i][2]);
+        }
+        return 'AED ' + text + units[i][1];
+      }
+    }
+    return 'AED ' + groupDigits(n);
+  }
+  function bedLabel(min, max) {
+    function one(n) { return n === 0 ? 'Studio' : String(n); }
+    if (min == null && max == null) return '';
+    if (min == null || max == null || min === max) {
+      var only = min == null ? max : min;
+      return only === 0 ? 'Studio' : only + ' BR';
+    }
+    return one(min) + ' to ' + max + ' BR';
+  }
+  function formatStamp(iso) {
+    if (typeof iso !== 'string') return '';
+    // Only ISO-shaped text is a date: the browser's lenient parser would turn "Test 5" into a day in 2001.
+    var moment = /^\d{4}-\d{2}-\d{2}/.test(iso) ? new Date(iso) : new Date(NaN);
+    if (isNaN(moment.getTime())) return cleanText(iso, 40);
+    // The file stores a UTC instant; both emirates keep the same clock, so show that.
+    try {
+      return new Intl.DateTimeFormat('en-GB', {
+        timeZone: 'Asia/Dubai', year: 'numeric', month: 'short', day: 'numeric',
+        hour: '2-digit', minute: '2-digit', hourCycle: 'h23', timeZoneName: 'short'
+      }).format(moment);
+    } catch (e) { return cleanText(iso, 40); }
+  }
+  // Lower-case with accents, Arabic vowel marks and the tatweel stretch removed, so
+  // "cafe" finds "Café" and an Arabic search ignores diacritics. (Letter variants
+  // such as the hamza carriers are different letters and are left alone.)
+  function foldText(value) {
+    return String(value == null ? '' : value).normalize('NFKD')
+      .replace(/[̀-ًͯ-ٰٟـ]/g, '').toLowerCase().replace(/\s+/g, ' ').trim();
+  }
+  function haversineKm(a, b) {
+    var R = 6371.0088, toRad = Math.PI / 180;
+    var dLat = (b[0] - a[0]) * toRad, dLng = (b[1] - a[1]) * toRad;
+    var s = Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+      Math.cos(a[0] * toRad) * Math.cos(b[0] * toRad) * Math.sin(dLng / 2) * Math.sin(dLng / 2);
+    return 2 * R * Math.asin(Math.min(1, Math.sqrt(s)));
+  }
+  function precisionNote(precision) {
+    return Object.prototype.hasOwnProperty.call(PRECISION_NOTES, precision) ? PRECISION_NOTES[precision] : PRECISION_NOTES.unknown;
+  }
+
+  // ---- one GeoJSON feature -> one pin (or null) ----
+  function cleanText(value, max) {
+    if (typeof value !== 'string') return '';
+    return value.replace(/[\u0000-\u0008\u000b-\u001f\u007f-\u009f\u202a-\u202e\u2066-\u2069]/g, ' ').replace(/\s+/g, ' ').trim().slice(0, max);
+  }
+  function finiteOrNull(value) { return typeof value === 'number' && isFinite(value) ? value : null; }
+  function wholeIn(value, lo, hi) {
+    var n = finiteOrNull(value);
+    return n !== null && n === Math.floor(n) && n >= lo && n <= hi ? n : null;
+  }
+  function inBox(lat, lng) {
+    return typeof lat === 'number' && typeof lng === 'number' && isFinite(lat) && isFinite(lng) &&
+      lat >= UAE_BBOX.minLat && lat <= UAE_BBOX.maxLat && lng >= UAE_BBOX.minLng && lng <= UAE_BBOX.maxLng;
+  }
+  function normalizeFeature(feature) {
+    if (!feature || typeof feature !== 'object') return null;
+    var g = feature.geometry, p = feature.properties;
+    if (!g || g.type !== 'Point' || !Array.isArray(g.coordinates) || g.coordinates.length < 2) return null;
+    var lng = g.coordinates[0], lat = g.coordinates[1];   // GeoJSON order is [lng, lat]
+    if (!inBox(lat, lng) || !p || typeof p !== 'object') return null;
+    if (EMIRATES.indexOf(p.emirate) < 0) return null;
+
+    var pin = {
+      lat: lat, lng: lng, emirate: p.emirate,
+      key: cleanText(p.project_key, 160), name: cleanText(p.name, 300), nameAr: cleanText(p.name_ar, 300),
+      developer: cleanText(p.developer, 300), area: cleanText(p.area, 300), master: cleanText(p.master_project, 300),
+      registry: cleanText(p.registry, 10), registryNo: cleanText(p.registry_no, 40),
+      status: cleanText(p.status, 80), completion: cleanText(p.completion_date, 10),
+      percent: finiteOrNull(p.percent_completed), units: wholeIn(p.units, 1, MAX_UNITS),
+      precision: (p.precision === 'exact' || p.precision === 'community' || p.precision === 'area') ? p.precision : 'unknown',
+      priceFrom: wholeIn(p.price_from, 1, MAX_PRICE_AED), priceTo: wholeIn(p.price_to, 1, MAX_PRICE_AED),
+      pricePerSqft: wholeIn(p.price_per_sqft, 1, MAX_PRICE_PER_SQFT),
+      bedsMin: wholeIn(p.bedrooms_min, 0, MAX_BEDROOMS), bedsMax: wholeIn(p.bedrooms_max, 0, MAX_BEDROOMS),
+      types: [], handover: cleanText(p.handover, 60), asOf: cleanText(p.as_of, 10),
+      sourceUrl: safeHttpUrl(p.source_url) || ''
+    };
+    if (pin.percent !== null && (pin.percent < 0 || pin.percent > 100)) pin.percent = null;
+    if (pin.priceFrom !== null && pin.priceTo !== null && pin.priceFrom > pin.priceTo) { pin.priceFrom = pin.priceTo = null; }
+    if (pin.bedsMin !== null && pin.bedsMax !== null && pin.bedsMin > pin.bedsMax) { pin.bedsMin = pin.bedsMax = null; }
+    if (Array.isArray(p.property_types)) {
+      p.property_types.forEach(function (t) { if (TYPE_ORDER.indexOf(t) >= 0 && pin.types.indexOf(t) < 0) pin.types.push(t); });
+    }
+    // A value shown without its source is a value we cannot stand behind.
+    if (!pin.sourceUrl) {
+      pin.priceFrom = pin.priceTo = pin.pricePerSqft = pin.bedsMin = pin.bedsMax = null;
+      pin.types = []; pin.handover = ''; pin.asOf = '';
+    }
+    pin.label = pin.name || pin.nameAr || pin.key || 'Unnamed project';
+    pin.haystack = foldText([pin.name, pin.nameAr, pin.developer, pin.key, pin.registry + ' ' + pin.registryNo,
+      pin.area, pin.master].join(' '));
+    return pin;
+  }
+  function hasListing(pin) {
+    return pin.priceFrom !== null || pin.priceTo !== null || pin.pricePerSqft !== null ||
+      pin.bedsMin !== null || pin.bedsMax !== null || pin.types.length > 0 || pin.handover !== '';
+  }
+
+  // ---- filters ----
+  // Every filter answers pass / fail / missing. A pin is shown only when nothing
+  // failed and nothing is missing; "missing" (no data for an ACTIVE filter) is kept
+  // apart from "fail" so the page can say how many pins it hid for lack of data.
+  function priceFilterActive(f) {
+    return f.priceMin > 0 && f.priceMax > f.priceMin && (f.loPos > 0 || f.hiPos < PRICE_STEPS);
+  }
+  function priceBounds(f) {
+    var a = Math.min(f.loPos, f.hiPos), b = Math.max(f.loPos, f.hiPos);
+    return {
+      lo: a > 0 ? posToPrice(a, f.priceMin, f.priceMax) : -Infinity,
+      hi: b < PRICE_STEPS ? posToPrice(b, f.priceMin, f.priceMax) : Infinity
+    };
+  }
+  function priceKnown(pin) { return pin.priceFrom !== null || pin.priceTo !== null; }
+  function priceInRange(pin, lo, hi) {
+    if (pin.priceFrom !== null && pin.priceTo !== null) return pin.priceFrom <= hi && pin.priceTo >= lo;
+    var only = pin.priceFrom !== null ? pin.priceFrom : pin.priceTo;   // one end known: that one price is certain
+    return only >= lo && only <= hi;
+  }
+  // Only sizes the source states count: a known 1..3 range covers 1, 2 and 3; a lone
+  // minimum or maximum covers just itself.
+  function bedsCover(pin, chip) {
+    var lo = pin.bedsMin, hi = pin.bedsMax;
+    if (lo === null && hi === null) return false;
+    if (lo === null || hi === null) { var only = lo === null ? hi : lo; return chip === 5 ? only >= 5 : only === chip; }
+    return chip === 5 ? hi >= 5 : (lo <= chip && chip <= hi);
+  }
+  function evaluatePin(pin, f) {
+    var failed = [], missing = [], approximate = false, dist = null, i;
+    if (f.emirates.indexOf(pin.emirate) < 0) failed.push('emirate');
+    for (i = 0; i < f.terms.length; i++) {
+      if (pin.haystack.indexOf(f.terms[i]) < 0) { failed.push('query'); break; }
+    }
+    if (f.status) {
+      if (!pin.status) missing.push('status');
+      else if (foldText(pin.status) !== f.status) failed.push('status');
+    }
+    if (f.types.length) {
+      if (!pin.types.length) missing.push('type');
+      else if (!f.types.some(function (t) { return pin.types.indexOf(t) >= 0; })) failed.push('type');
+    }
+    if (f.beds.length) {
+      if (pin.bedsMin === null && pin.bedsMax === null) missing.push('beds');
+      else if (!f.beds.some(function (c) { return bedsCover(pin, c); })) failed.push('beds');
+    }
+    if (priceFilterActive(f)) {
+      if (!priceKnown(pin)) missing.push('price');
+      else { var b = priceBounds(f); if (!priceInRange(pin, b.lo, b.hi)) failed.push('price'); }
+    }
+    if (f.centre) {
+      if (pin.precision !== 'exact') approximate = true;     // radius search never trusts a centroid
+      else { dist = haversineKm(f.centre, [pin.lat, pin.lng]); if (dist > f.radiusKm) failed.push('radius'); }
+    }
+    return { show: failed.length === 0 && missing.length === 0 && !approximate,
+             failed: failed, missing: missing, approximate: approximate, dist: dist };
+  }
+
+  var PURE = {
+    SCHEMA: SCHEMA, UAE_BBOX: UAE_BBOX, EMIRATES: EMIRATES, PRECISIONS: PRECISIONS, TYPE_ORDER: TYPE_ORDER,
+    BED_CHIPS: BED_CHIPS, PRICE_STEPS: PRICE_STEPS, PRECISION_NOTES: PRECISION_NOTES,
+    MAX_BEDROOMS: MAX_BEDROOMS, MAX_PRICE_AED: MAX_PRICE_AED, MAX_PRICE_PER_SQFT: MAX_PRICE_PER_SQFT,
+    MAX_UNITS: MAX_UNITS,
+    escapeHtml: escapeHtml, safeHttpUrl: safeHttpUrl, hostnameOf: hostnameOf,
+    posToPrice: posToPrice, priceToPos: priceToPos, groupDigits: groupDigits,
+    formatAed: formatAed, formatAedFull: formatAedFull, bedLabel: bedLabel, formatStamp: formatStamp,
+    foldText: foldText, haversineKm: haversineKm, precisionNote: precisionNote,
+    normalizeFeature: normalizeFeature, hasListing: hasListing, evaluatePin: evaluatePin,
+    priceFilterActive: priceFilterActive, bedsCover: bedsCover
+  };
+  /* === PURE-END === */
+
+  // ------------------------------------------------------------------------
+  // Everything below touches the DOM or Leaflet.
+  // ------------------------------------------------------------------------
+  function $(id) { return document.getElementById(id); }
+  function clearNode(node) { while (node.firstChild) node.removeChild(node.firstChild); }
+
+  // Builds DOM without ever parsing markup. Text goes in through textContent; an
+  // attribute named on* or style is refused, so data can never become a handler.
+  function el(tag, props, kids) {
+    var node = document.createElement(tag);
+    Object.keys(props || {}).forEach(function (name) {
+      var value = props[name];
+      if (value === null || value === undefined || value === false) return;
+      var lower = name.toLowerCase();
+      if (lower.indexOf('on') === 0 || lower === 'style' || lower === 'srcdoc') throw new Error('refused attribute: ' + name);
+      if (name === 'class') node.className = value;
+      else if (name === 'text') node.textContent = String(value);
+      else node.setAttribute(name, value === true ? '' : String(value));
+    });
+    (kids || []).forEach(function (kid) {
+      if (kid === null || kid === undefined || kid === false) return;
+      node.appendChild(typeof kid === 'string' ? document.createTextNode(kid) : kid);
+    });
+    return node;
+  }
+  // The single place a link is created: scheme-checked, and never able to reach back
+  // into this page (noopener) or leak it as a referrer (noreferrer).
+  function externalLink(href, text) {
+    var safe = safeHttpUrl(href);
+    if (!safe) return document.createTextNode(text);
+    return el('a', { href: safe, target: '_blank', rel: 'noopener noreferrer', text: text });
+  }
+  function joinParts(parts, sep) { return parts.filter(function (x) { return x; }).join(sep); }
+  function cssVar(name, fallback) {
+    try {
+      var value = window.getComputedStyle(document.documentElement).getPropertyValue(name);
+      return (value && value.trim()) || fallback;
+    } catch (e) { return fallback; }
+  }
+  function emirateColor(emirate) {
+    return emirate === 'Sharjah' ? cssVar('--sharjah', '#B2530E') : cssVar('--dubai', '#0B7A6E');
+  }
+
+  var els = {
+    stats: $('stats'), notice: $('notice'), q: $('q'), emirateChips: $('emirateChips'),
+    status: $('status'), statusCov: $('statusCov'), typeChips: $('typeChips'), typeCov: $('typeCov'),
+    bedChips: $('bedChips'), bedCov: $('bedCov'), priceLo: $('priceLo'), priceHi: $('priceHi'),
+    priceLabel: $('priceLabel'), priceCov: $('priceCov'), pick: $('pick'), clear: $('clearRadius'),
+    radius: $('radius'), radiusLabel: $('radiusLabel'), radiusNote: $('radiusNote'),
+    header: $('resultsHeader'), list: $('list'), credits: $('credits'), side: $('side'),
+    toggle: $('toggleSide'), reload: $('reload'), reset: $('resetFilters')
+  };
+
+  var MAX_LIST_ROWS = 300;
+  var FALLBACK_CREDITS = ['Map data (c) OpenStreetMap contributors', 'Open Database Licence (ODbL) 1.0'];
+
+  // ---- state ----
+  var pins = [];                  // normalised pins, each with .marker
+  var meta = {};
+  var emirateOn = EMIRATES.slice();
+  var typesOn = [], bedsOn = [];
+  var statusFold = '';
+  var terms = [];
+  var priceMin = null, priceMax = null, loPos = 0, hiPos = PRICE_STEPS;
+  var centre = null, radiusKm = 5;
+  var picking = false, loadSeq = 0;
+  var map = null, cluster = null, centreMarker = null, circle = null;
+
+  function showNotice(kind, messages) {
+    clearNode(els.notice);
+    els.notice.className = 'notice ' + kind;
+    els.notice.setAttribute('role', kind === 'error' ? 'alert' : 'status');
+    messages.forEach(function (message) { els.notice.appendChild(el('p', { text: message })); });
+    els.notice.hidden = false;
+  }
+  function hideNotice() { clearNode(els.notice); els.notice.hidden = true; }
+
+  function showFatal(message) {
+    showNotice('error', [message]);
+    clearNode(els.stats);
+    els.stats.textContent = 'No data';
+    clearNode(els.list);
+    els.list.appendChild(el('div', { class: 'empty', text: 'Nothing to show.' }));
+    els.header.textContent = '—';
+  }
+
+  // ---- map ----
+  function initMap() {
+    map = L.map('map', { zoomControl: true, preferCanvas: true }).setView([25.2, 55.3], 9);
+    L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
+      maxZoom: 19,
+      attribution: 'Map data &copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors, ' +
+        '<a href="https://opendatacommons.org/licenses/odbl/1-0/">ODbL</a>'
+    }).addTo(map);
+    // No disableClusteringAtZoom on purpose: every project pinned at a community
+    // centroid shares ONE coordinate, and only spiderfying can pull those apart.
+    cluster = L.markerClusterGroup({ maxClusterRadius: 44, spiderfyOnMaxZoom: true, showCoverageOnHover: false });
+    map.addLayer(cluster);
+    map.on('click', function (e) { if (picking) { setCentre(e.latlng); stopPicking(); } });
+  }
+
+  function markerStyle(pin) {
+    var color = emirateColor(pin.emirate);
+    if (pin.precision === 'exact') {
+      return { radius: 7, weight: 1.5, color: cssVar('--marker-edge', '#ffffff'), fillColor: color, fillOpacity: 0.95, opacity: 1 };
+    }
+    // Hollow: a ring with only a faint wash, so a centroid never reads as a located building.
+    return { radius: 7, weight: 2.5, color: color, fillColor: color, fillOpacity: 0.08, opacity: 1 };
+  }
+
+  // ---- popup (DOM only) ----
+  function fact(label, value) {
+    return el('div', { class: 'fact' }, [el('span', { class: 'k', text: label }), value]);
+  }
+  function priceText(pin) {
+    if (pin.priceFrom !== null && pin.priceTo !== null) {
+      return pin.priceFrom === pin.priceTo ? formatAedFull(pin.priceFrom) : formatAedFull(pin.priceFrom) + ' to ' + formatAedFull(pin.priceTo);
+    }
+    if (pin.priceFrom !== null) return 'from ' + formatAedFull(pin.priceFrom);
+    if (pin.priceTo !== null) return 'up to ' + formatAedFull(pin.priceTo);
+    return '';
+  }
+  function popupNode(pin) {
+    var root = el('div', { class: 'pop' });
+    root.appendChild(el('h3', { text: pin.label }));
+    if (pin.nameAr && pin.nameAr !== pin.label) root.appendChild(el('div', { class: 'ar', dir: 'auto', lang: 'ar', text: pin.nameAr }));
+    root.appendChild(el('div', { class: 'meta', text: joinParts([pin.developer, pin.emirate, pin.area, pin.master], ' · ') }));
+
+    var progress = joinParts([pin.status, pin.percent !== null ? trimNumber(pin.percent, 1) + '% complete' : ''], ' · ');
+    if (progress) root.appendChild(fact('Status', progress));
+    if (pin.completion) root.appendChild(fact('Completion (actual or planned)', pin.completion));
+    if (pin.units !== null) root.appendChild(fact('Units', groupDigits(pin.units)));
+    root.appendChild(el('div', { class: 'prec ' + (pin.precision === 'exact' ? 'exact' : 'approx'), text: precisionNote(pin.precision) }));
+
+    var lst = el('div', { class: 'lst' });
+    if (hasListing(pin)) {
+      if (priceText(pin)) lst.appendChild(fact('Price', priceText(pin)));
+      if (pin.pricePerSqft !== null) lst.appendChild(fact('Per sq ft', formatAedFull(pin.pricePerSqft)));
+      if (bedLabel(pin.bedsMin, pin.bedsMax)) lst.appendChild(fact('Bedrooms', bedLabel(pin.bedsMin, pin.bedsMax)));
+      if (pin.types.length) lst.appendChild(fact('Type', pin.types.join(', ')));
+      if (pin.handover) lst.appendChild(fact('Handover', pin.handover));
+      var src = el('div', { class: 'src' }, ['Source: ', externalLink(pin.sourceUrl, hostnameOf(pin.sourceUrl))]);
+      if (pin.asOf) src.appendChild(document.createTextNode(' · as of ' + pin.asOf));
+      lst.appendChild(src);
+    } else {
+      lst.appendChild(el('div', { class: 'src', text: 'No price or configuration data yet.' }));
+    }
+    root.appendChild(lst);
+    var reg = pin.registryNo ? pin.registry + ' ' + pin.registryNo : pin.key;
+    if (reg) root.appendChild(el('div', { class: 'reg mono', text: reg }));
+    return root;
+  }
+
+  // ---- header ----
+  function metaCount(value) { return typeof value === 'number' && isFinite(value) && value >= 0 ? value : null; }
+  function renderStats() {
+    clearNode(els.stats);
+    var byEmirate = meta.by_emirate || {}, byPrecision = meta.by_precision || {};
+    var counted = { Dubai: 0, Sharjah: 0, exact: 0, community: 0, area: 0, unknown: 0 };
+    pins.forEach(function (pin) { counted[pin.emirate]++; counted[pin.precision]++; });
+
+    var located = el('span', { class: 'grp' }, [el('span', { class: 'lbl', text: 'Located' })]);
+    EMIRATES.forEach(function (name) {
+      var entry = byEmirate[name] || {};
+      var n = metaCount(entry.located), total = metaCount(entry.projects);
+      located.appendChild(el('span', {}, [name + ' ', el('b', { class: 'mono', text: groupDigits(n !== null ? n : counted[name]) }),
+        total !== null ? ' of ' + groupDigits(total) : '']));
+    });
+    var precision = el('span', { class: 'grp' }, [el('span', { class: 'lbl', text: 'Precision' })]);
+    var names = { exact: 'exact', community: 'community', area: 'area', unknown: 'not recorded' };
+    PRECISIONS.forEach(function (key) {
+      var n = metaCount(byPrecision[key]);
+      precision.appendChild(el('span', {}, [
+        el('i', { class: 'sym' + (key === 'exact' ? '' : ' hollow') }), ' ' + names[key] + ' ',
+        el('b', { class: 'mono', text: groupDigits(n !== null ? n : counted[key]) })]));
+    });
+    els.stats.appendChild(located);
+    els.stats.appendChild(precision);
+    if (meta.generated_at) {
+      els.stats.appendChild(el('span', { class: 'grp' }, ['Data as of ', el('b', { text: formatStamp(meta.generated_at) })]));
+    }
+  }
+  function renderCredits() {
+    clearNode(els.credits);
+    var lines = Array.isArray(meta.attribution) ? meta.attribution.filter(function (s) { return typeof s === 'string' && s; }) : [];
+    (lines.length ? lines : FALLBACK_CREDITS).slice(0, 4).forEach(function (line) {
+      els.credits.appendChild(el('div', { text: cleanText(line, 200) }));
+    });
+  }
+
+  // ---- controls built from the data ----
+  function chip(label, count, pressed, extraClass, onToggle) {
+    var button = el('button', { type: 'button', class: 'chip' + (extraClass ? ' ' + extraClass : ''), 'aria-pressed': pressed ? 'true' : 'false' });
+    if (extraClass && extraClass.indexOf('emirate') >= 0) button.appendChild(el('i', { class: 'sym' }));
+    button.appendChild(document.createTextNode(label));
+    if (count !== null) button.appendChild(el('span', { class: 'mono', text: String(count) }));
+    button.addEventListener('click', function () {
+      var on = button.getAttribute('aria-pressed') !== 'true';
+      button.setAttribute('aria-pressed', on ? 'true' : 'false');
+      onToggle(on);
+      render();
+    });
+    return button;
+  }
+  function toggleIn(list, value, on) {
+    var at = list.indexOf(value);
+    if (on && at < 0) list.push(value);
+    if (!on && at >= 0) list.splice(at, 1);
+  }
+  function count(predicate) { var n = 0; pins.forEach(function (p) { if (predicate(p)) n++; }); return n; }
+
+  function buildControls() {
+    emirateOn = EMIRATES.slice(); typesOn = []; bedsOn = []; statusFold = ''; terms = [];
+    els.q.value = '';
+
+    clearNode(els.emirateChips);
+    EMIRATES.forEach(function (name) {
+      els.emirateChips.appendChild(chip(name + ' ', count(function (p) { return p.emirate === name; }), true,
+        'emirate c-' + name.toLowerCase(), function (on) { toggleIn(emirateOn, name, on); }));
+    });
+
+    // Status: grouped case-insensitively, shown the way the first row spelled it.
+    var seen = {}, order = [];
+    pins.forEach(function (p) {
+      var key = foldText(p.status);
+      if (key && !seen[key]) { seen[key] = p.status; order.push(key); }
+    });
+    order.sort();
+    clearNode(els.status);
+    els.status.appendChild(el('option', { value: '', text: 'Any status' }));
+    order.forEach(function (key) { els.status.appendChild(el('option', { value: key, text: seen[key] })); });
+    els.status.value = '';
+    var withStatus = count(function (p) { return p.status !== ''; });
+    els.statusCov.textContent = 'Status known for ' + groupDigits(withStatus) + ' of ' + groupDigits(pins.length) + ' pins. Choosing one hides pins with no status.';
+
+    clearNode(els.typeChips);
+    var typeCounts = {};
+    pins.forEach(function (p) { p.types.forEach(function (t) { typeCounts[t] = (typeCounts[t] || 0) + 1; }); });
+    TYPE_ORDER.filter(function (t) { return typeCounts[t]; }).forEach(function (t) {
+      els.typeChips.appendChild(chip(t + ' ', typeCounts[t], false, '', function (on) { toggleIn(typesOn, t, on); }));
+    });
+    var withTypes = count(function (p) { return p.types.length > 0; });
+    els.typeCov.textContent = withTypes
+      ? 'Type known for ' + groupDigits(withTypes) + ' of ' + groupDigits(pins.length) + ' pins. Choosing a type hides pins with no type.'
+      : 'No property types in the data yet.';
+
+    clearNode(els.bedChips);
+    BED_CHIPS.forEach(function (c) {
+      var n = count(function (p) { return bedsCover(p, c.value); });
+      els.bedChips.appendChild(chip(c.label + ' ', n, false, '', function (on) { toggleIn(bedsOn, c.value, on); }));
+    });
+    var withBeds = count(function (p) { return p.bedsMin !== null || p.bedsMax !== null; });
+    els.bedCov.textContent = withBeds
+      ? 'Bedrooms known for ' + groupDigits(withBeds) + ' of ' + groupDigits(pins.length) + ' pins. A stated 1 to 3 BR range matches 1, 2 and 3. Choosing a size hides pins with no bedroom data.'
+      : 'No bedroom data yet.';
+
+    buildPrice();
+  }
+
+  function buildPrice() {
+    var low = null, high = null, priced = 0;
+    pins.forEach(function (p) {
+      var any = false;
+      [p.priceFrom, p.priceTo].forEach(function (v) {
+        if (v === null) return;
+        any = true;
+        if (low === null || v < low) low = v;
+        if (high === null || v > high) high = v;
+      });
+      if (any) priced++;
+    });
+    loPos = 0; hiPos = PRICE_STEPS;
+    els.priceLo.value = '0'; els.priceHi.value = String(PRICE_STEPS);
+    if (low === null) {
+      priceMin = priceMax = null;
+      els.priceLo.disabled = els.priceHi.disabled = true;
+      els.priceCov.textContent = 'No price data yet, so the price filter is off. Prices appear once they are entered in Listing_Data with a source.';
+    } else if (low === high) {
+      priceMin = priceMax = null;
+      els.priceLo.disabled = els.priceHi.disabled = true;
+      els.priceCov.textContent = 'Every price in the data is ' + formatAedFull(low) + ', so there is nothing to filter between.';
+    } else {
+      priceMin = low; priceMax = high;
+      els.priceLo.disabled = els.priceHi.disabled = false;
+    }
+    els.priceCov.setAttribute('data-priced', String(priced));
+    updatePriceLabel(priced);
+  }
+  function updatePriceLabel(pricedArg) {
+    var priced = pricedArg !== undefined ? pricedArg : Number(els.priceCov.getAttribute('data-priced') || 0);
+    if (priceMin === null) { els.priceLabel.textContent = priced ? '' : 'No price data'; return; }
+    var a = Math.min(loPos, hiPos), b = Math.max(loPos, hiPos);
+    var text;
+    if (a === 0 && b === PRICE_STEPS) text = 'Any price (' + formatAed(priceMin) + ' to ' + formatAed(priceMax) + ')';
+    else if (a === 0) text = 'Up to ' + formatAed(posToPrice(b, priceMin, priceMax));
+    else if (b === PRICE_STEPS) text = 'From ' + formatAed(posToPrice(a, priceMin, priceMax));
+    else text = formatAed(posToPrice(a, priceMin, priceMax)) + ' to ' + formatAed(posToPrice(b, priceMin, priceMax));
+    els.priceLabel.textContent = text;
+    els.priceCov.textContent = 'Price known for ' + groupDigits(priced) + ' of ' + groupDigits(pins.length) +
+      ' pins. Narrowing the range hides the ' + groupDigits(pins.length - priced) + ' pins with no price.';
+  }
+
+  // ---- filtering + rendering ----
+  function currentFilters() {
+    return { emirates: emirateOn, terms: terms, status: statusFold, types: typesOn, beds: bedsOn,
+             priceMin: priceMin, priceMax: priceMax, loPos: loPos, hiPos: hiPos, centre: centre, radiusKm: radiusKm };
+  }
+  var HIDDEN_WORDS = { price: 'no price data', beds: 'no bedroom data', type: 'no property type', status: 'no status' };
+
+  function rowNode(pin) {
+    var button = el('button', { type: 'button', class: 'row c-' + pin.emirate.toLowerCase() });
+    button.appendChild(el('i', { class: 'sym' + (pin.precision === 'exact' ? '' : ' hollow') }));
+    button.appendChild(el('span', { class: 'main' }, [
+      el('span', { class: 'name', text: pin.label }),
+      el('span', { class: 'meta', text: joinParts([pin.developer, pin.area || pin.master], ' · ') })]));
+    var aside = '';
+    if (pin.dist !== null && pin.dist !== undefined) aside = pin.dist.toFixed(2) + ' km';
+    else if (priceKnownText(pin)) aside = priceKnownText(pin);
+    button.appendChild(el('span', { class: 'aside mono', text: aside }));
+    button.addEventListener('click', function () { focusPin(pin); });
+    return button;
+  }
+  function priceKnownText(pin) {
+    var first = pin.priceFrom !== null ? pin.priceFrom : pin.priceTo;
+    return first === null ? '' : (pin.priceFrom !== null ? 'from ' : 'up to ') + formatAed(first);
+  }
+  // On a phone the panel covers the map; folding it away resizes the map, which Leaflet has to be told
+  // about (invalidateSize) before it centres on anything, or the target lands off-centre.
+  function collapsePanelOnPhone() {
+    if (window.innerWidth > 760) return;
+    els.side.classList.add('collapsed');
+    els.toggle.setAttribute('aria-expanded', 'false');
+    map.invalidateSize();
+  }
+  var focusSeq = 0;
+  function focusPin(pin) {
+    collapsePanelOnPhone();
+    map.setView([pin.lat, pin.lng], Math.max(map.getZoom(), 15));
+    var seq = ++focusSeq, opened = false, tries = 0;
+    function open() { if (!opened && seq === focusSeq) { opened = true; pin.marker.openPopup(); } }
+    function ask() {
+      if (opened || seq !== focusSeq) return;
+      cluster.zoomToShowLayer(pin.marker, open);
+      // The marker layer forgets a request made while it is still re-clustering after the zoom above (the
+      // popup then never opened), so ask again a moment later; a newer choice cancels the older one.
+      if (++tries < 5) setTimeout(ask, 300);
+    }
+    ask();
+  }
+
+  function render() {
+    if (!pins.length) {          // nothing located: say so rather than "0 projects match"
+      clearNode(els.header);
+      els.header.textContent = 'No located projects';
+      clearNode(els.list);
+      els.list.appendChild(el('div', { class: 'empty', text: 'No project has a confirmed location yet.' }));
+      els.radiusNote.hidden = true;
+      return;
+    }
+    var f = currentFilters();
+    var shown = [], hidden = { price: 0, beds: 0, type: 0, status: 0 }, approxLeftOut = 0, exactTotal = 0;
+    for (var i = 0; i < pins.length; i++) {
+      var pin = pins[i], r = evaluatePin(pin, f);
+      if (pin.precision === 'exact') exactTotal++;
+      if (r.show) { pin.dist = r.dist; shown.push(pin); }
+      else if (r.failed.length === 0) {
+        if (r.approximate) approxLeftOut++;
+        else r.missing.forEach(function (name) { hidden[name]++; });
+      }
+    }
+    if (centre) shown.sort(function (a, b) { return a.dist - b.dist; });
+    else shown.sort(function (a, b) { return a.label.localeCompare(b.label, 'en'); });
+
+    cluster.clearLayers();
+    cluster.addLayers(shown.map(function (pin) { return pin.marker; }));
+
+    // header line
+    clearNode(els.header);
+    els.header.appendChild(el('span', { class: 'mono', text: groupDigits(shown.length) }));
+    var one = shown.length === 1;
+    els.header.appendChild(document.createTextNode(centre
+      ? (one ? ' exact project' : ' exact projects') + ' within ' + radiusKm.toFixed(1) + ' km of the chosen point'
+      : (one ? ' project matches the filters' : ' projects match the filters')));
+    Object.keys(hidden).forEach(function (name) {
+      if (hidden[name] > 0) {
+        els.header.appendChild(el('span', { class: 'warn', text: groupDigits(hidden[name]) + ' hidden: ' + HIDDEN_WORDS[name] }));
+      }
+    });
+    if (shown.length > MAX_LIST_ROWS) els.header.appendChild(document.createTextNode(' · list shows the first ' + MAX_LIST_ROWS));
+
+    // radius note
+    if (centre) {
+      var parts = [];
+      if (exactTotal === 0) parts.push('There are no exact pins in the data yet, so a radius search has nothing to search.');
+      else if (approxLeftOut > 0) parts.push(groupDigits(approxLeftOut) + ' approximate pin' + (approxLeftOut === 1 ? ' is' : 's are') +
+        ' not included: radius search uses exact pins only.');
+      els.radiusNote.textContent = parts.join(' ');
+      els.radiusNote.hidden = parts.length === 0;
+    } else { els.radiusNote.textContent = ''; els.radiusNote.hidden = true; }
+
+    // list
+    clearNode(els.list);
+    if (!shown.length) {
+      els.list.appendChild(el('div', { class: 'empty', text: 'Nothing matches. Clear a filter or widen the radius.' }));
+      return;
+    }
+    shown.slice(0, MAX_LIST_ROWS).forEach(function (pin) { els.list.appendChild(rowNode(pin)); });
+  }
+
+  // ---- loading ----
+  function loadError(kind, detail) { var e = new Error(kind); e.kind = kind; e.detail = detail; return e; }
+  function failureMessage(err) {
+    switch (err && err.kind) {
+      case 'http':
+        return err.detail === 404
+          ? 'pins.geojson was not found. It is written by scripts/export_map_pins.py after each scraper run and has not been published here yet.'
+          : 'pins.geojson could not be loaded (HTTP ' + err.detail + ').';
+      case 'json': return 'pins.geojson is not valid JSON. The export may have been interrupted: run it again.';
+      case 'shape': return 'pins.geojson does not have the expected format (a FeatureCollection with a feature list).';
+      case 'schema': return 'pins.geojson was written by a different version of the exporter (schema ' + err.detail + ', this page reads ' + SCHEMA + ').';
+      default: return 'pins.geojson could not be fetched (network error). If this page was opened straight from disk, serve the folder over http first, then press Refresh.';
+    }
+  }
+
+  function ingest(data) {
+    if (!data || typeof data !== 'object' || data.type !== 'FeatureCollection' || !Array.isArray(data.features)) throw loadError('shape');
+    meta = data.meta && typeof data.meta === 'object' ? data.meta : {};
+    if (meta.schema !== undefined && meta.schema !== SCHEMA) throw loadError('schema', String(meta.schema));
+
+    cluster.clearLayers();
+    pins = [];
+    var skipped = 0;
+    data.features.forEach(function (feature) {
+      var pin = normalizeFeature(feature);
+      if (!pin) { skipped++; return; }
+      pin.marker = L.circleMarker([pin.lat, pin.lng], markerStyle(pin)).bindPopup(function () { return popupNode(pin); }, { maxWidth: 320 });
+      pin.dist = null;
+      pins.push(pin);
+    });
+
+    resetRadius();
+    buildControls();
+    renderStats();
+    renderCredits();
+
+    var warnings = [];
+    if (skipped) warnings.push(skipped + ' entr' + (skipped === 1 ? 'y' : 'ies') + ' in pins.geojson had unusable coordinates or an unknown emirate and were skipped.');
+    var unreadable = metaCount(meta.unreadable_rows);
+    if (unreadable) warnings.push(unreadable + ' sheet row' + (unreadable === 1 ? '' : 's') + ' could not be read when this file was made, so the map is incomplete.');
+    var unlocated = metaCount(meta.total_unlocated);
+    if (!pins.length) {
+      warnings.unshift('No project has a confirmed location yet' +
+        (metaCount(meta.total_projects) ? ' (' + groupDigits(meta.total_projects) + ' are in the registry data but none could be placed)' : '') +
+        '. The map fills in as the scraper locates them.');
+      showNotice('info', warnings);
+    } else if (warnings.length) {
+      showNotice('warn', warnings);
+    } else {
+      hideNotice();
+    }
+    if (pins.length && unlocated) {
+      els.credits.appendChild(el('div', { text: groupDigits(unlocated) + ' project' + (unlocated === 1 ? ' is' : 's are') + ' in the registry data but not yet located, so not drawn.' }));
+    }
+    render();
+  }
+
+  function load() {
+    var seq = ++loadSeq;
+    els.stats.textContent = 'Loading pins…';
+    return Promise.resolve()
+      .then(function () { return fetch('pins.geojson', { cache: 'no-store' }); })
+      .then(function (response) {
+        if (!response.ok) throw loadError('http', response.status);
+        return response.text();
+      })
+      .then(function (text) {
+        try { return JSON.parse(text); } catch (e) { throw loadError('json'); }
+      })
+      .then(function (data) { if (seq === loadSeq) ingest(data); })
+      .catch(function (err) {
+        if (seq !== loadSeq) return;
+        if (cluster) cluster.clearLayers();
+        pins = []; meta = {};
+        showFatal(failureMessage(err));
+      });
+  }
+
+  // ---- radius tool ----
+  function setCentre(latlng) {
+    centre = [latlng.lat, latlng.lng];
+    var accent = cssVar('--accent', '#0B6A8F');
+    if (!centreMarker) {
+      centreMarker = L.marker(latlng, {
+        draggable: true, title: 'Radius centre', keyboard: false,
+        icon: L.divIcon({ className: 'centre-pin', iconSize: [18, 18] })
+      }).addTo(map);
+      centreMarker.on('dragend', function () { setCentre(centreMarker.getLatLng()); });
+    } else centreMarker.setLatLng(latlng);
+    if (!circle) {
+      circle = L.circle(latlng, { radius: radiusKm * 1000, color: accent, weight: 1.5, fillColor: accent, fillOpacity: 0.08, interactive: false }).addTo(map);
+    } else { circle.setLatLng(latlng); circle.setRadius(radiusKm * 1000); }
+    els.clear.hidden = false;
+    map.fitBounds(circle.getBounds(), { padding: [20, 20] });
+    render();
+  }
+  function stopPicking() {
+    picking = false;
+    document.body.classList.remove('picking');
+    els.pick.classList.remove('active');
+    els.pick.textContent = centre ? 'Pick a new centre' : 'Pick a centre on the map';
+  }
+  function resetRadius() {
+    centre = null;
+    if (centreMarker) { map.removeLayer(centreMarker); centreMarker = null; }
+    if (circle) { map.removeLayer(circle); circle = null; }
+    els.clear.hidden = true;
+    stopPicking();
+  }
+
+  // ---- wiring (done once) ----
+  var searchTimer = null;
+  function wire() {
+    els.q.addEventListener('input', function () {
+      clearTimeout(searchTimer);
+      searchTimer = setTimeout(function () {
+        terms = foldText(els.q.value).split(' ').filter(Boolean);
+        render();
+      }, 120);
+    });
+    els.status.addEventListener('change', function () { statusFold = els.status.value; render(); });
+    els.priceLo.addEventListener('input', function () {
+      loPos = Number(els.priceLo.value);
+      if (loPos > hiPos) { hiPos = loPos; els.priceHi.value = String(hiPos); }
+      updatePriceLabel(); render();
+    });
+    els.priceHi.addEventListener('input', function () {
+      hiPos = Number(els.priceHi.value);
+      if (hiPos < loPos) { loPos = hiPos; els.priceLo.value = String(loPos); }
+      updatePriceLabel(); render();
+    });
+    els.pick.addEventListener('click', function () {
+      picking = !picking;
+      document.body.classList.toggle('picking', picking);
+      els.pick.classList.toggle('active', picking);
+      els.pick.textContent = picking ? 'Now click on the map…' : (centre ? 'Pick a new centre' : 'Pick a centre on the map');
+      if (picking) collapsePanelOnPhone();
+    });
+    els.clear.addEventListener('click', function () { resetRadius(); render(); });
+    els.radius.addEventListener('input', function () {
+      radiusKm = parseFloat(els.radius.value);
+      els.radiusLabel.textContent = radiusKm.toFixed(1) + ' km';
+      if (circle) { circle.setRadius(radiusKm * 1000); render(); }
+    });
+    els.toggle.addEventListener('click', function () {
+      var collapsed = els.side.classList.toggle('collapsed');
+      els.toggle.setAttribute('aria-expanded', collapsed ? 'false' : 'true');
+      setTimeout(function () { map.invalidateSize(); }, 50);
+    });
+    els.reload.addEventListener('click', load);
+    els.reset.addEventListener('click', function () { resetRadius(); buildControls(); render(); });
+    if (window.matchMedia) {
+      var dark = window.matchMedia('(prefers-color-scheme: dark)');
+      if (dark.addEventListener) dark.addEventListener('change', function () {
+        pins.forEach(function (pin) { pin.marker.setStyle(markerStyle(pin)); });
+      });
+    }
+  }
+
+  if (typeof L === 'undefined' || typeof L.markerClusterGroup !== 'function') {
+    showFatal('The map library could not be loaded (blocked or offline), so nothing can be drawn. Check the connection and reload the page.');
+    return;
+  }
+  initMap();
+  wire();
+  load();
+})();
+</script>
+</body>
+</html>

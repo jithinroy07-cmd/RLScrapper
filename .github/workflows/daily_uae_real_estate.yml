@@ -1,0 +1,162 @@
+# Daily run: test, scrape the registries, sync the private Google Sheet, export map pins.
+#
+# This repository is PUBLIC, and the artifacts and logs of a public repository
+# are readable by anyone. The data licence is not settled yet (docs/DESIGN.md
+# section 10), so by default this workflow publishes NO registry data anywhere:
+#   - no artifact is uploaded unless the repository VARIABLE UPLOAD_SNAPSHOT is "true";
+#   - nothing is deployed to GitHub Pages unless the repository VARIABLE DEPLOY_MAP is "true";
+#   - the code logs counts and row numbers, never row contents, project keys or secret values.
+#
+# Settings are read from repository secrets and variables by NAME (the list is in
+# docs/DESIGN.md section 9 and setup_google_sheets.md). An unset or empty value
+# means "use the built-in default", which src/config.py owns, so no default is
+# repeated here to drift out of date.
+#
+# Two free-text settings are deliberately NOT passed: GOOGLE_SHEET_NAME and
+# GEOCODE_USER_AGENT. GitHub prints every non-secret value (each repository
+# variable) in the step header of a public log, and either one could carry a
+# business name or a contact address. CI therefore uses the defaults in
+# src/config.py, and the geocoder's contact address comes from the GEOCODE_CONTACT
+# secret. A local .env can still set both.
+#
+# Actions are pinned to major version tags (the node24 majors, since GitHub removed
+# Node 20 from its runners in September 2026). A tag can move; Dependabot version
+# updates for github-actions would make each bump a reviewed pull request.
+#
+# GitHub disables scheduled workflows of a public repository after 60 days
+# without repository activity. If the daily run stops, open the Actions tab and
+# re-enable it (or push any commit).
+
+name: Daily UAE Real Estate Scraper
+
+on:
+  schedule:
+    # 03:00 UTC = 07:00 in the UAE (GST, UTC+4).
+    - cron: "0 3 * * *"
+  workflow_dispatch:
+
+# Read-only by default. Only the deploy job below is given more.
+permissions:
+  contents: read
+
+# One run at a time, queued rather than cancelled, so a manual run started during
+# the daily one waits instead of racing it for the sheet or the Pages deployment.
+concurrency:
+  group: daily-uae-real-estate
+  cancel-in-progress: false
+
+jobs:
+  scrape-and-sync:
+    name: Test, scrape and sync to the sheet
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    env:
+      PYTHONUNBUFFERED: "1"
+
+    steps:
+      - name: Check out the code
+        uses: actions/checkout@v6
+        with:
+          # No later step pushes anything, so the token is not left on disk.
+          persist-credentials: false
+
+      - name: Set up Python 3.12
+        uses: actions/setup-python@v7
+        with:
+          python-version: "3.12"
+          cache: pip
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+
+      # Fails the job when the test step below could pass without running the suite:
+      # a changed pytest.ini, a conftest.py, a PYTEST_* variable, deleted test files.
+      # It runs right before the tests and, like the test step, has no secrets.
+      - name: Check the test gate
+        run: python -m scripts.check_test_gate
+
+      # A failing test stops the job here, before any credential is used. This
+      # step deliberately has no secrets: the suite must pass with no network and
+      # no credentials.
+      - name: Run the test suite
+        run: python -m pytest
+
+      # Secrets are passed to the steps that need them and to no others.
+      - name: Scrape registries and sync the sheet
+        env:
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+          GCP_SERVICE_ACCOUNT_KEY: ${{ secrets.GCP_SERVICE_ACCOUNT_KEY }}
+          SPREADSHEET_ID: ${{ secrets.SPREADSHEET_ID }}
+          DATA_DUBAI_API_KEY: ${{ secrets.DATA_DUBAI_API_KEY }}
+          DATA_DUBAI_API_SECRET: ${{ secrets.DATA_DUBAI_API_SECRET }}
+          LOCATIONIQ_API_KEY: ${{ secrets.LOCATIONIQ_API_KEY }}
+          GEOAPIFY_API_KEY: ${{ secrets.GEOAPIFY_API_KEY }}
+          GOOGLE_MAPS_API_KEY: ${{ secrets.GOOGLE_MAPS_API_KEY }}
+          SHARE_WITH_EMAILS: ${{ secrets.SHARE_WITH_EMAILS }}
+          # A real contact address for the geocoder's User-Agent: a secret, because the
+          # value of a variable is printed in the (public) step log and a secret is masked.
+          GEOCODE_CONTACT: ${{ secrets.GEOCODE_CONTACT }}
+          GEMINI_MODEL: ${{ vars.GEMINI_MODEL }}
+          ENABLE_SRERD: ${{ vars.ENABLE_SRERD }}
+          ENABLE_GEMINI_NEWS: ${{ vars.ENABLE_GEMINI_NEWS }}
+          REQUIRE_SOURCES: ${{ vars.REQUIRE_SOURCES }}
+          ALLOW_ROW_DROP: ${{ vars.ALLOW_ROW_DROP }}
+          GEOCODE_ENABLED: ${{ vars.GEOCODE_ENABLED }}
+          GEOCODE_BACKEND: ${{ vars.GEOCODE_BACKEND }}
+          GEOCODE_MAX_PER_RUN: ${{ vars.GEOCODE_MAX_PER_RUN }}
+          GEOCODE_RETRY_COOLDOWN_DAYS: ${{ vars.GEOCODE_RETRY_COOLDOWN_DAYS }}
+          GEOCODE_TIME_BUDGET_SECONDS: ${{ vars.GEOCODE_TIME_BUDGET_SECONDS }}
+          GEOCODE_FLUSH_EVERY: ${{ vars.GEOCODE_FLUSH_EVERY }}
+          SHARE_ROLE: ${{ vars.SHARE_ROLE }}
+          SHARE_NOTIFY: ${{ vars.SHARE_NOTIFY }}
+        run: python -m src.main
+
+      # While DEPLOY_MAP is on, a map with no pins is an error and not a publication: this
+      # step fails, so the deploy job below never starts and the last good map stays up.
+      # While it is off nothing is published, so an empty export is harmless.
+      - name: Export map pins
+        env:
+          GCP_SERVICE_ACCOUNT_KEY: ${{ secrets.GCP_SERVICE_ACCOUNT_KEY }}
+          SPREADSHEET_ID: ${{ secrets.SPREADSHEET_ID }}
+          MIN_PINS: ${{ vars.DEPLOY_MAP == 'true' && '1' || '0' }}
+        run: python -m scripts.export_map_pins --out site/pins.geojson --min-pins "$MIN_PINS"
+
+      # Off unless UPLOAD_SNAPSHOT is "true": artifacts of a public repository are
+      # public. Kept short-lived for the same reason. Runs even after a failed
+      # scrape, so a snapshot is there to debug with when the owner turned it on.
+      - name: Upload the JSON snapshot
+        if: ${{ always() && vars.UPLOAD_SNAPSHOT == 'true' }}
+        uses: actions/upload-artifact@v7
+        with:
+          name: uae-real-estate-snapshot-${{ github.run_id }}
+          path: scraped_projects_latest.json
+          retention-days: 7
+          if-no-files-found: ignore
+
+      # Off unless DEPLOY_MAP is "true" (the hosting decision is still open). Only
+      # reached when every step above succeeded.
+      - name: Package the map for GitHub Pages
+        if: ${{ vars.DEPLOY_MAP == 'true' }}
+        uses: actions/upload-pages-artifact@v5
+        with:
+          path: site
+
+  deploy-map:
+    name: Publish the map to GitHub Pages
+    needs: scrape-and-sync
+    if: ${{ vars.DEPLOY_MAP == 'true' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    # The only job that may write to Pages or request an OIDC token.
+    permissions:
+      pages: write
+      id-token: write
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v5

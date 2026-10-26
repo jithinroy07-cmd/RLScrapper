@@ -1,0 +1,30 @@
+{
+  "_comment": "# SYNTHETIC - invented rows for tests, not real register data",
+  "total": 6,
+  "last_updated": "2026-10-20",
+  "data": [
+    {
+      "PROJECT_NUMBER": "",
+      "PROJECT_NAME": "Test Villas C",
+      "DEVELOPER_NAME": "Example Developer Two LLC",
+      "AREA_NAME_EN": "Test Area Three",
+      "PROJECT_STATUS": "PENDING",
+      "COMPLETION_DATE": "0001-01-01T00:00:00",
+      "CANCELLATION_DATE": "1970-01-01"
+    },
+    {
+      "PROJECT_NUMBER": "N/A",
+      "PROJECT_NAME": "Test Orphan Tower",
+      "AREA_NAME_EN": "Test Area Three"
+    },
+    {
+      "PROJECT_NUMBER": 1006.0,
+      "PROJECT_NAME": "Test Towers D",
+      "DEVELOPER_NAME": "Example Developer LLC",
+      "AREA_NAME_EN": "Test Area Two",
+      "PROJECT_STATUS": "ACTIVE",
+      "PROJECT_END_DATE": "2028/01/15",
+      "COMPLETION_DATE": "15-09-2026"
+    }
+  ]
+}
