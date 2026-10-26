@@ -1,10 +1,12 @@
 # Daily run: test, scrape the registries, sync the private Google Sheet, export map pins.
 #
 # This repository is PUBLIC, and the artifacts and logs of a public repository
-# are readable by anyone. The data licence is not settled yet (docs/DESIGN.md
-# section 10), so by default this workflow publishes NO registry data anywhere:
+# are readable by anyone. Hosting the map publicly on GitHub Pages is DECIDED (27 October
+# 2026); the Dubai Land Department data licence is still unclarified (docs/DESIGN.md
+# section 10). So this workflow publishes NO registry data until the owner switches it on:
 #   - no artifact is uploaded unless the repository VARIABLE UPLOAD_SNAPSHOT is "true";
-#   - nothing is deployed to GitHub Pages unless the repository VARIABLE DEPLOY_MAP is "true";
+#   - nothing is deployed to GitHub Pages unless the repository VARIABLE DEPLOY_MAP is "true"
+#     (the owner sets it once real data flows: setup_google_sheets.md, section 10);
 #   - the code logs counts and row numbers, never row contents, project keys or secret values.
 #
 # Settings are read from repository secrets and variables by NAME (the list is in
@@ -135,8 +137,8 @@ jobs:
           retention-days: 7
           if-no-files-found: ignore
 
-      # Off unless DEPLOY_MAP is "true" (the hosting decision is still open). Only
-      # reached when every step above succeeded.
+      # Off unless DEPLOY_MAP is "true" (GitHub Pages is the decided host; the owner turns
+      # this on once real data flows). Only reached when every step above succeeded.
       - name: Package the map for GitHub Pages
         if: ${{ vars.DEPLOY_MAP == 'true' }}
         uses: actions/upload-pages-artifact@v5
