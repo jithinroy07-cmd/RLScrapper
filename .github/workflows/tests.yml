@@ -1,0 +1,55 @@
+# Tests on every push and pull request. This closes the gap the daily workflow leaves:
+# that workflow runs the test gate and the suite only at the start of a scheduled or
+# manual run, so a broken commit used to go unnoticed until the next morning.
+#
+# This workflow has NO secrets and needs none: the suite runs with no network and no
+# credentials, and the gate is a pure check of the repository. It publishes nothing.
+# It is intentionally not pull_request_target, so a fork's pull request never runs
+# with this repository's permissions.
+
+name: Tests
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: tests-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  test:
+    name: Test gate and test suite
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    env:
+      PYTHONUNBUFFERED: "1"
+
+    steps:
+      - name: Check out the code
+        uses: actions/checkout@v6
+        with:
+          persist-credentials: false
+
+      - name: Set up Python 3.12
+        uses: actions/setup-python@v7
+        with:
+          python-version: "3.12"
+          cache: pip
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+
+      - name: Check the test gate
+        run: python -m scripts.check_test_gate
+
+      - name: Run the test suite
+        run: python -m pytest

@@ -1,0 +1,9 @@
+# The files that decide whether the tests really run, what the daily run installs and
+# which secrets it sees. A pull request that touches any of them asks the owner for a
+# review. This file only has an effect once "Require review from Code Owners" is
+# switched on in a ruleset for main (setup_google_sheets.md, section 9).
+/.github/                       @jithinroy07-cmd
+/scripts/check_test_gate.py     @jithinroy07-cmd
+/pytest.ini                     @jithinroy07-cmd
+/requirements.txt               @jithinroy07-cmd
+/tests/                         @jithinroy07-cmd

@@ -1,0 +1,17 @@
+# Dependabot version updates: each bump of a Python dependency or of a GitHub action
+# arrives as a pull request that runs the Tests workflow and needs a review, instead
+# of silently changing what the daily run installs. (docs/DESIGN.md section 8,
+# "Hardening that is an owner decision".)
+version: 2
+updates:
+  - package-ecosystem: pip
+    directory: /
+    schedule:
+      interval: weekly
+    open-pull-requests-limit: 5
+
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+    open-pull-requests-limit: 5
