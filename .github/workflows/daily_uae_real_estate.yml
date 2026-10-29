@@ -57,7 +57,7 @@ jobs:
 
     steps:
       - name: Check out the code
-        uses: actions/checkout@v6
+        uses: actions/checkout@v7
         with:
           # No later step pushes anything, so the token is not left on disk.
           persist-credentials: false
