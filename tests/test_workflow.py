@@ -1152,13 +1152,13 @@ def test_variable_names_match_the_design():
     # The design may list the two free-text settings the workflow does not pass beside the variables or
     # beside the local-only ones; either way every setting it names is known here, and every known one is named.
     documented = _design_names("Variables") | _design_names("Local-only")
-    assert VARIABLE_NAMES | LOCAL_ONLY_SETTINGS | {"GCP_SERVICE_ACCOUNT_FILE"} == documented
+    assert VARIABLE_NAMES | LOCAL_ONLY_SETTINGS | {"GCP_SERVICE_ACCOUNT_FILE", "DATA_DUBAI_PROJECTS_FILE"} == documented
 
 
 def test_env_example_and_workflow_agree_on_names(doc):
     text = ENV_EXAMPLE_PATH.read_text(encoding="utf-8")
     declared = set(re.findall(r"^#?\s*([A-Z][A-Z0-9_]+)=", text, re.M))
-    local_only = {"GCP_SERVICE_ACCOUNT_FILE"} | LOCAL_ONLY_SETTINGS
+    local_only = {"GCP_SERVICE_ACCOUNT_FILE", "DATA_DUBAI_PROJECTS_FILE"} | LOCAL_ONLY_SETTINGS
     passed = set(step_of(doc, "scrape")["env"])
     assert passed <= declared, f"the workflow passes names .env.example does not declare: {sorted(passed - declared)}"
     forgotten = declared - local_only - passed - {"DEPLOY_MAP"}

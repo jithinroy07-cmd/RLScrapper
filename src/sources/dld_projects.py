@@ -14,6 +14,13 @@ rows:
     -> error (a partial registry would delete projects on the next merge);
   * most rows unusable -> error with the reasons counted.
 
+A second way in, for a person with no key yet: the portal lets a signed-in user download
+the same dataset as a JSON file. With DATA_DUBAI_PROJECTS_FILE (local .env only; the
+workflow never passes it) pointing at that file, fetch() reads it instead of calling the
+API, through the same schema check, row mapping and unusable-row guards. The 28 October
+2026 download (3481 rows) mapped with the aliases below unchanged, which is the only
+live evidence of the column names so far. The path is never logged.
+
 The emirate is Dubai because the registry is DLD (DESIGN section 1), never because
 of anything in a row. The registry id is the DLD project number; when a row has no
 valid one it is left None and the row is keyed by developer + name instead.
@@ -21,6 +28,7 @@ valid one it is left None and the row is keyed by developer + name instead.
 
 from __future__ import annotations
 
+import json
 import logging
 import time
 from datetime import date
@@ -31,6 +39,7 @@ from src.models import DLD_ID_RE, RegistryRow, clean_registry_id, utc_now_iso
 from src.sources.base import (
     DEFAULT_RETRY,
     MAX_TEXT_LEN,
+    as_date,
     RetryPolicy,
     RowTally,
     SourceError,
@@ -62,6 +71,11 @@ SOURCE_NAME = "dld_projects"
 # The data route. Stated as "dataAPIEndpoints" on the catalogue record of the dataset
 # (https://data.dubai/o/c/datasets/467654, read 25 Oct 2026); the route answers 401 without a key.
 DLD_PROJECTS_URL = "https://apis.data.dubai/open/dld/dld_projects-open-api"
+# The dataset's page on the portal, where a signed-in person downloads the file that
+# DATA_DUBAI_PROJECTS_FILE points at. Rows read from such a file carry it as their Source Dataset.
+DLD_DOWNLOAD_PAGE = "https://data.dubai/en/web/guest/l/467654"
+# The per-row load stamp in the portal's download; its date is the source refresh date.
+LOAD_STAMP_ALIASES = ("loadtimestamp", "loaddate", "loadtime")
 # DOCUMENTED, NOT EXERCISED: the same catalogue record ("How to use" section) gives this
 # authentication service: POST ...?grant_type=client_credentials with the body
 # client_id={API Key}&client_secret={API Secret}, then "Authorization: Bearer {access_token}"
@@ -133,6 +147,8 @@ R_DUPLICATE = "duplicate project number (first row kept)"
 A_BAD_NUMBER = "project number is not 1 to 9 ASCII digits; blanked"
 A_NAME_KEY = "no valid project number; keyed by developer and name"
 UNCONFIRMED_END_NOTE = "the end of the register was not confirmed by an empty page"
+FILE_NOTE = "read from the local download named by DATA_DUBAI_PROJECTS_FILE; the API was not called"
+FILE_WINS_NOTE = "DATA_DUBAI_API_KEY and DATA_DUBAI_API_SECRET are set too, but the local download wins"
 
 
 def check_schema(records: Sequence[Any]) -> None:
@@ -306,9 +322,11 @@ class DldProjectsAdapter:
 
     # -- switches ---------------------------------------------------------------
     def enabled(self, cfg: Config) -> bool:
-        return cfg.has_data_dubai_credentials
+        return cfg.has_data_dubai_credentials or bool(cfg.data_dubai_projects_file)
 
     def skip_reason(self, cfg: Config) -> str:
+        if cfg.data_dubai_projects_file:
+            return ""
         missing = [
             name
             for name, value in (
@@ -324,6 +342,8 @@ class DldProjectsAdapter:
         if not self.enabled(self._cfg):
             raise SourceError(f"{self.name}: {self.skip_reason(self._cfg)}")
         today = resolve_today(self._today)
+        if self._cfg.data_dubai_projects_file:
+            return self._fetch_from_file(today)
         with session_scope(self._session) as session:
             token = self._request_token(session)
             secrets = (self._cfg.data_dubai_api_key, self._cfg.data_dubai_api_secret, token)
@@ -352,6 +372,52 @@ class DldProjectsAdapter:
         if pages > 1 and tally.dropped_count(R_DUPLICATE):
             notes.append("duplicate project numbers across pages: the API's paging order may not be stable")
         logger.info("%s: %d row(s) kept from %d raw row(s), %d page(s)", self.name, len(rows), len(records), pages)
+        return SourceResult(
+            source=self.name, rows=rows, fetched_at=utc_now_iso(), source_refreshed=refreshed, notes=notes
+        )
+
+    def _fetch_from_file(self, today: date) -> SourceResult:
+        """The register from a downloaded copy of the dataset: same checks as the API path, no request."""
+        label = f"{self.name} local download"
+        try:
+            with open(self._cfg.data_dubai_projects_file, "rb") as handle:
+                raw = handle.read()
+        except OSError as exc:
+            # The path is a typed setting and never shown; the class says enough (FileNotFoundError, PermissionError).
+            raise SourceError(f"{label}: the file cannot be read ({type(exc).__name__})") from None
+        try:
+            payload = json.loads(raw.decode("utf-8-sig"))
+        except (UnicodeDecodeError, ValueError) as exc:
+            raise SourceError(f"{label}: the file is not UTF-8 JSON ({type(exc).__name__})") from None
+        records = extract_records(payload)
+        if records is None:
+            shape = describe_keys(payload) if isinstance(payload, Mapping) else f"a {type(payload).__name__}"
+            raise SourceError(f"{label}: the file has no list of rows (it contained: {shape})")
+        if not records:
+            raise SourceError(f"{label}: the file has no rows at all")
+        check_schema(records)
+        refreshed = extract_refreshed(payload)
+        if refreshed is None:
+            first = next((r for r in records if isinstance(r, Mapping)), None)
+            refreshed = first_match(normalise_record(first), LOAD_STAMP_ALIASES, as_date) if first is not None else None
+
+        tally = RowTally()
+        rows = parse_dld_records(
+            records, today=today, source_dataset=DLD_DOWNLOAD_PAGE, source_refreshed=refreshed, tally=tally
+        )
+        if not rows:
+            raise SourceError(f"{self.name}: none of the {len(records)} row(s) could be used: {tally.dropped_summary()}")
+        if tally.dropped * 2 > len(records):
+            raise SourceError(
+                f"{self.name}: {tally.dropped} of {len(records)} row(s) were unusable, "
+                f"more than {int(MAX_DROPPED_SHARE * 100)} percent: {tally.dropped_summary()}"
+            )
+        notes = [f"{FILE_NOTE} ({len(records)} raw row(s))"]
+        if self._cfg.has_data_dubai_credentials:
+            notes.append(FILE_WINS_NOTE)
+            logger.warning("%s: %s", self.name, FILE_WINS_NOTE)
+        notes += tally.notes()
+        logger.info("%s: %d row(s) kept from %d raw row(s) in the local download", self.name, len(rows), len(records))
         return SourceResult(
             source=self.name, rows=rows, fetched_at=utc_now_iso(), source_refreshed=refreshed, notes=notes
         )

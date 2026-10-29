@@ -650,3 +650,124 @@ def test_the_public_constants_are_marked_unverified_where_they_are_guesses():
     for name in ("DATA_DUBAI_TOKEN_URL", "TOKEN_GRANT_TYPE", "DLD_PAGE_SIZE"):
         assert name in source
     assert source.count("UNVERIFIED") >= 3
+
+
+# ---------------------------------------------------------------------------
+# The local download (DATA_DUBAI_PROJECTS_FILE): the register from a file a signed-in
+# person downloaded from the dataset's portal page, with no key and no request
+# ---------------------------------------------------------------------------
+def write_download(tmp_path, payload, name="projects_download.json", text=None):
+    path = tmp_path / name
+    if text is None:
+        text = json.dumps(payload, ensure_ascii=False)
+    path.write_text(text, encoding="utf-8")
+    return str(path)
+
+
+def portal_rows():
+    """Rows shaped like the portal's download: snake_case keys, a bare project_name, a load_timestamp."""
+    return [
+        {
+            "project_number": 2001, "project_name": "Test Gate Residences", "developer_name": "Example Developer LLC",
+            "area_name_en": "Test Area One", "project_status": "ACTIVE", "percent_completed": "67.98000",
+            "no_of_units": 152, "load_timestamp": "2026-10-28 19:08:11",
+        },
+        {
+            "project_number": 2002, "project_name": "برج اختبار", "developer_name": "مطور اختبار",
+            "area_name_en": "Test Area Two", "project_status": "FINISHED", "percent_completed": "100",
+            "no_of_units": 10, "load_timestamp": "2026-10-28 19:08:11",
+        },
+    ]
+
+
+def file_cfg(path, **extra):
+    return make_cfg(DATA_DUBAI_PROJECTS_FILE=path, **extra)
+
+
+def test_a_download_path_enables_the_source_without_credentials(tmp_path):
+    cfg = file_cfg(write_download(tmp_path, portal_rows()))
+    adapter = DldProjectsAdapter(cfg, session=FakeSession([]), today=TODAY)
+    assert adapter.enabled(cfg) and adapter.skip_reason(cfg) == ""
+    assert not DldProjectsAdapter(make_cfg(), session=FakeSession([]), today=TODAY).enabled(make_cfg())
+
+
+def test_the_download_is_read_with_no_request_and_the_rows_say_where_they_came_from(tmp_path):
+    session = FakeSession([])
+    result = DldProjectsAdapter(file_cfg(write_download(tmp_path, portal_rows())), session=session, today=TODAY).fetch()
+    assert session.calls == []
+    assert [r.project_key for r in result.rows] == ["dld:dubai:2001", "dld:dubai:2002"]
+    assert result.rows[0].project_name_en == "Test Gate Residences" and result.rows[1].project_name_ar == "برج اختبار"
+    assert {r.source_dataset for r in result.rows} == {dld.DLD_DOWNLOAD_PAGE}
+    assert result.source_refreshed == "2026-10-28" and {r.source_refreshed for r in result.rows} == {"2026-10-28"}
+    assert result.notes[0].startswith(dld.FILE_NOTE) and "2 raw row(s)" in result.notes[0]
+    assert dld.FILE_WINS_NOTE not in result.notes
+
+
+def test_an_enveloped_download_is_read_too(tmp_path):
+    payload = {"data": portal_rows(), "refreshed_at": "2026-10-20"}
+    result = DldProjectsAdapter(file_cfg(write_download(tmp_path, payload)), session=FakeSession([]), today=TODAY).fetch()
+    assert len(result.rows) == 2 and result.source_refreshed == "2026-10-20"
+
+
+def test_a_utf8_bom_in_the_download_is_tolerated(tmp_path):
+    path = tmp_path / "bom.json"
+    path.write_bytes(b"\xef\xbb\xbf" + json.dumps(portal_rows()).encode("utf-8"))
+    result = DldProjectsAdapter(file_cfg(str(path)), session=FakeSession([]), today=TODAY).fetch()
+    assert len(result.rows) == 2
+
+
+def test_the_download_wins_over_credentials_and_says_so(tmp_path, caplog):
+    cfg = file_cfg(write_download(tmp_path, portal_rows()), DATA_DUBAI_API_KEY=FAKE_KEY, DATA_DUBAI_API_SECRET=FAKE_SECRET)
+    session = FakeSession([])
+    with caplog.at_level("WARNING", logger="src.sources.dld_projects"):
+        result = DldProjectsAdapter(cfg, session=session, today=TODAY).fetch()
+    assert session.calls == [] and dld.FILE_WINS_NOTE in result.notes
+    assert any(dld.FILE_WINS_NOTE in rec.getMessage() for rec in caplog.records)
+    assert_no_secret(caplog.text)
+
+
+def test_a_missing_download_is_an_error_that_names_the_class_not_the_path(tmp_path):
+    path = str(tmp_path / "secret-folder-name" / "nope.json")
+    session = FakeSession([])
+    with pytest.raises(SourceError) as info:
+        DldProjectsAdapter(file_cfg(path), session=session, today=TODAY).fetch()
+    text = full_text(info.value)
+    assert "FileNotFoundError" in str(info.value) and "cannot be read" in str(info.value)
+    assert "secret-folder-name" not in text and "nope.json" not in text and session.calls == []
+
+
+@pytest.mark.parametrize(
+    "text, expected",
+    [
+        ("{not json", "not UTF-8 JSON"),
+        ("42", "no list of rows"),
+        ('{"meta": {"x": 1}}', "no list of rows"),
+        ("[]", "no rows at all"),
+        ('[{"PROJECT_NUMBER": 1}]', "no recognised column"),
+    ],
+)
+def test_a_download_of_the_wrong_shape_fails_loudly(tmp_path, text, expected):
+    with pytest.raises(SourceError) as info:
+        DldProjectsAdapter(file_cfg(write_download(tmp_path, None, text=text)), session=FakeSession([]), today=TODAY).fetch()
+    assert expected in str(info.value)
+
+
+def test_a_download_that_is_not_utf8_is_an_error_without_the_bytes(tmp_path):
+    path = tmp_path / "latin1.json"
+    path.write_bytes(b'[{"project_number": 1, "project_name": "Caf\xe9 Tower"}]')
+    with pytest.raises(SourceError) as info:
+        DldProjectsAdapter(file_cfg(str(path)), session=FakeSession([]), today=TODAY).fetch()
+    assert "not UTF-8 JSON" in str(info.value) and "Caf" not in full_text(info.value)
+
+
+def test_a_download_in_which_most_rows_are_unusable_fails(tmp_path):
+    rows = portal_rows() + [{"project_number": None, "project_name": "", "developer_name": ""} for _ in range(3)]
+    with pytest.raises(SourceError) as info:
+        DldProjectsAdapter(file_cfg(write_download(tmp_path, rows)), session=FakeSession([]), today=TODAY).fetch()
+    assert "unusable" in str(info.value)
+
+
+def test_the_download_setting_is_local_only_and_never_described():
+    cfg = file_cfg("some/where.json")
+    assert cfg.data_dubai_projects_file == "some/where.json"
+    assert "DATA_DUBAI_PROJECTS_FILE" not in cfg.describe() and "some/where" not in str(cfg.describe())

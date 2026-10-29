@@ -1413,7 +1413,7 @@ def _env_example_assignments() -> dict[str, str]:
 
 def test_env_example_names_every_setting():
     names = set(_env_example_assignments())
-    expected = set(SECRET_NAMES) | set(VARIABLE_NAMES) | {"GCP_SERVICE_ACCOUNT_FILE"}
+    expected = set(SECRET_NAMES) | set(VARIABLE_NAMES) | {"GCP_SERVICE_ACCOUNT_FILE", "DATA_DUBAI_PROJECTS_FILE"}
     assert expected <= names, sorted(expected - names)
     assert names <= expected, sorted(names - expected)
 

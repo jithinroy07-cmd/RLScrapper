@@ -12,7 +12,7 @@ Read this before relying on a number. Nothing below has been checked against a l
 
 | Part | State |
 |---|---|
-| Dubai registry (`dld_projects`) | Built against the documented schema and synthetic test data. **Never run against the live Data.Dubai service**: it needs a free key and secret that have not been issued yet, and the live column names are unverified. Until both are set the source is skipped. |
+| Dubai registry (`dld_projects`) | Built against the documented schema and synthetic test data. **Never run against the live Data.Dubai service**: it needs a free key and secret that have not been issued yet, and the live column names are unverified. Until both are set the source is skipped, unless a local run points `DATA_DUBAI_PROJECTS_FILE` at a copy of the dataset downloaded from its portal page: the adapter then reads that file instead (see "Loading the official download by hand"). The 28 October 2026 download mapped with the existing column names unchanged, so the first live API run is less likely to need fixes. |
 | Sharjah registry (`srerd_projects`) | **Off by default and unverified.** There is no official feed; the adapter reads one public list page (project name, area, ownership type; no id and no developer) and refuses any response it does not recognise. Turn it on only after a supervised test (`ENABLE_SRERD=true`). |
 | Hand-researched seed (`seed_csv`) | Ships with only a header row. Every row needs a source URL. |
 | News discovery (`gemini_news`) | Off by default (`ENABLE_GEMINI_NEWS=true` turns it on). It only proposes rows for the `Launch_Candidates` tab; a person decides what they are. |
@@ -128,6 +128,16 @@ Things to know about a public repository:
 - While `DEPLOY_MAP` is on, the pin export requires at least one located project (`--min-pins 1`), so an empty map is never published and the last good one stays up. The first deploy therefore waits until the first project has been geocoded. A thin but non-empty map (for example after a bad day with few lookups) is still published.
 - The daily run changes the sheet, not the repository, so a quiet repository will hit the 60-day rule.
 - Scheduled runs use the workflow file on the default branch. The daily workflow itself has no push or pull-request trigger. A second workflow, `.github/workflows/tests.yml` ("Tests"), runs the test gate and the suite on every push and pull request to `main`, with no secrets, so a broken commit is noticed when it is pushed, not at the next morning's run. The daily run still repeats both checks before using any credential.
+
+## Loading the official download by hand
+
+A signed-in user of the Data.Dubai portal can download the DLD "Real Estate Projects" dataset as a JSON file from its page (dataset 467654) without an API key. A local run can load that file into the sheet:
+
+```
+DATA_DUBAI_PROJECTS_FILE=<path to the downloaded .json file>
+```
+
+Put that line in `.env` (never in a repository variable; the workflow does not pass it), then `python -m src.main --dry-run` to read the counts, then `python -m src.main`. The adapter reads the file through the same schema check, row mapping and unusable-row guards as the API path, makes no request, stamps the rows' `Source Dataset` with the dataset page and takes the refresh date from the rows' `load_timestamp`. The 28 October 2026 download holds 3481 rows, of which 3479 map (two have no name), every one keyed by its project number. The file is registry data, so keep it outside the repository or under a git-ignored path (`backups/` is ignored) and never commit it: the data licence is unclarified ("Open decisions"). If the API key and secret are set as well, the file still wins and the run says so. The daily run cannot do this for you, so the register is only as fresh as your last download until the key arrives.
 
 ## Cleaning up duplicate rows
 

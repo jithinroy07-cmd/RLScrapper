@@ -104,6 +104,9 @@ class Config:
 
     # Local-only (a path, not a secret, but never meaningful in CI)
     gcp_service_account_file: str = "service_account.json"
+    # Local-only: a copy of the DLD "Real Estate Projects" dataset downloaded from the Data.Dubai
+    # portal by hand. When set, dld_projects reads it instead of calling the API (no key needed).
+    data_dubai_projects_file: str = ""
 
     # Variables
     google_sheet_name: str = DEFAULT_SHEET_NAME
@@ -318,6 +321,7 @@ def load_config(
         google_maps_api_key=_text(source, "GOOGLE_MAPS_API_KEY"),
         share_with_emails=_parse_list(_text(source, "SHARE_WITH_EMAILS")),
         gcp_service_account_file=_text(source, "GCP_SERVICE_ACCOUNT_FILE") or "service_account.json",
+        data_dubai_projects_file=_text(source, "DATA_DUBAI_PROJECTS_FILE"),
         google_sheet_name=_text(source, "GOOGLE_SHEET_NAME") or DEFAULT_SHEET_NAME,
         gemini_model=_text(source, "GEMINI_MODEL"),
         enable_srerd=_parse_bool(source, "ENABLE_SRERD", False, warnings),
