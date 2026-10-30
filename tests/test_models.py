@@ -1232,6 +1232,40 @@ def test_secrets_never_appear_in_repr_or_describe():
     assert load_config({}).describe()["GEMINI_API_KEY"] == "not set"
 
 
+FAKE_SHEET_ID = "1AbCdEfGhIjKlMnOpQrStUvWxYz0123456789_-fake"
+
+
+@pytest.mark.parametrize(
+    "typed, note",
+    [
+        (FAKE_SHEET_ID, None),
+        (f"https://docs.google.com/spreadsheets/d/{FAKE_SHEET_ID}/edit?gid=0#gid=0", "sheet address"),
+        (f"https://docs.google.com/spreadsheets/d/{FAKE_SHEET_ID}/edit", "sheet address"),
+        (f"https://docs.google.com/spreadsheets/u/1/d/{FAKE_SHEET_ID}/edit#gid=5", "sheet address"),
+        (f"docs.google.com/spreadsheets/d/{FAKE_SHEET_ID}", "sheet address"),
+        (f"{FAKE_SHEET_ID}/edit?gid=0", "text after the id"),
+        (f"{FAKE_SHEET_ID}/edit#gid=0", "text after the id"),
+        (f"{FAKE_SHEET_ID}/", "text after the id"),
+        (f"  {FAKE_SHEET_ID}  ", None),
+        (f"{FAKE_SHEET_ID}?gid=0", "text after the id"),
+    ],
+)
+def test_spreadsheet_id_is_taken_out_of_a_pasted_address(typed, note):
+    cfg = load_config({"SPREADSHEET_ID": typed})
+    assert cfg.spreadsheet_id == FAKE_SHEET_ID
+    if note:
+        assert len(cfg.warnings) == 1 and note in cfg.warnings[0] and "SPREADSHEET_ID" in cfg.warnings[0]
+        assert FAKE_SHEET_ID not in cfg.warnings[0] and "docs.google" not in cfg.warnings[0]
+    else:
+        assert cfg.warnings == ()
+
+
+def test_an_unrecognised_spreadsheet_id_is_passed_on_untouched_and_not_echoed():
+    cfg = load_config({"SPREADSHEET_ID": "not/an/id"})
+    assert cfg.spreadsheet_id == "not/an/id" and cfg.warnings == ()
+    assert load_config({"SPREADSHEET_ID": ""}).spreadsheet_id == ""
+
+
 def test_describe_covers_every_documented_name():
     described = set(load_config({}).describe())
     # the names describe() prints, plus the explicit workflow-only ones, are exactly the documented names

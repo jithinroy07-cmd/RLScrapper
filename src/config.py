@@ -203,6 +203,28 @@ def _text(env: Mapping[str, str], name: str) -> str:
     return (env.get(name) or "").strip()
 
 
+_SHEET_URL_ID = re.compile(r"/spreadsheets/(?:u/\d+/)?d/([A-Za-z0-9_-]+)")
+_SHEET_ID_WITH_TAIL = re.compile(r"([A-Za-z0-9_-]{20,})(?:[/?#].*)?")
+
+
+def _spreadsheet_id(env: Mapping[str, str], warnings: list[str]) -> str:
+    """
+    SPREADSHEET_ID as the bare id. A person often pastes the sheet's whole address, or the id
+    followed by /edit or ?gid=0; the id is taken out of either, with a warning that names the
+    setting only. Any other value is passed on as typed (Google decides), and never echoed.
+    """
+    raw = _text(env, "SPREADSHEET_ID")
+    match = _SHEET_URL_ID.search(raw)
+    if match:
+        warnings.append("SPREADSHEET_ID was given as a sheet address; the id between /d/ and /edit was taken from it")
+        return match.group(1)
+    match = _SHEET_ID_WITH_TAIL.fullmatch(raw)
+    if match and match.group(1) != raw:
+        warnings.append("SPREADSHEET_ID carried text after the id; the id before it was taken")
+        return match.group(1)
+    return raw
+
+
 def _parse_bool(env: Mapping[str, str], name: str, default: bool, warnings: list[str]) -> bool:
     """
     Unset or empty means the default. GitHub Actions renders an unset repository
@@ -313,7 +335,7 @@ def load_config(
     return Config(
         gemini_api_key=_text(source, "GEMINI_API_KEY"),
         gcp_service_account_key=_text(source, "GCP_SERVICE_ACCOUNT_KEY"),
-        spreadsheet_id=_text(source, "SPREADSHEET_ID"),
+        spreadsheet_id=_spreadsheet_id(source, warnings),
         data_dubai_api_key=_text(source, "DATA_DUBAI_API_KEY"),
         data_dubai_api_secret=_text(source, "DATA_DUBAI_API_SECRET"),
         locationiq_api_key=_text(source, "LOCATIONIQ_API_KEY"),

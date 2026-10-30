@@ -34,7 +34,7 @@ Keep the downloaded file out of the repository. `.gitignore` already excludes `s
 
 1. In Google Sheets, create an empty spreadsheet. Name it `UAE Real Estate Projects Tracker`, the built-in default title. The daily run opens the sheet by `SPREADSHEET_ID`, so the title matters only if the job ever has to look a sheet up by name; CI always uses the default title (a different one can be set with `GOOGLE_SHEET_NAME` in a local `.env` only, see section 5).
 2. Share it with the service account's email address, with the **Editor** role. Turn off the notification email.
-3. Copy the spreadsheet id: the long token in the browser address between `/d/` and `/edit`. That is the secret `SPREADSHEET_ID`.
+3. Copy the spreadsheet id: the long token in the browser address between `/d/` and `/edit`. That is the secret `SPREADSHEET_ID`. (If the whole address is pasted instead, the run takes the id out of it and logs a warning that names the setting; a wrong id is answered by Google with HTTP 400 or 404 at "open the configured spreadsheet".)
 
 Tabs are owned either by the machine (the daily run rewrites them) or by people (the run never overwrites them); the README, "What each tab is for", has the table. In short: do not hand-edit `Map_Pins` or `Scrape_Run_Logs`; put pins in `Geocode_Overrides`; and expect a hand edit to a cell the registry feed fills in `Registry_Projects` to be reverted by the next run.
 
