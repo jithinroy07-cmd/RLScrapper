@@ -59,7 +59,7 @@ In the repository, open Settings, then "Secrets and variables", then "Actions", 
 
 | Secret | What it is | Needed for |
 |---|---|---|
-| `GCP_SERVICE_ACCOUNT_KEY` | The whole service-account JSON file, pasted as is (line breaks included; only a local `.env` needs it on one line, see section 3) | Reading and writing the sheet |
+| `GCP_SERVICE_ACCOUNT_KEY` | The whole service-account JSON file, pasted as is (line breaks included; only a local `.env` needs it on one line, see section 3). If pasting keeps failing with "is not valid JSON", paste the file's base64 encoding instead (`base64 -w0 key.json` on Linux or macOS, `[Convert]::ToBase64String([IO.File]::ReadAllBytes('key.json'))` in PowerShell): the run decodes it. A byte-order mark, surrounding whitespace or one pair of quotes around the whole file are tolerated as well. The error says only how long the value was and whether it began with `{`, never its text. | Reading and writing the sheet |
 | `SPREADSHEET_ID` | The id from step 2 | Reaching the existing sheet |
 | `DATA_DUBAI_API_KEY` | Data.Dubai API key | Dubai registry source (not issued yet) |
 | `DATA_DUBAI_API_SECRET` | Data.Dubai API secret | Dubai registry source (not issued yet) |

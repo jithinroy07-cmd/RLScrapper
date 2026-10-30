@@ -12,6 +12,7 @@ call sequence would also be accepted by Google, not merely that a mock was satis
 
 from __future__ import annotations
 
+import base64
 import inspect
 import json
 import logging
@@ -765,6 +766,43 @@ class TestAuthentication:
         if secret_fragment:
             assert secret_fragment not in text
         assert caught.value.__cause__ is None
+
+    @pytest.mark.parametrize(
+        "wrap",
+        [
+            lambda s: "\ufeff" + s,                       # a byte-order mark from an editor
+            lambda s: "  \n" + s + "\n\n",                 # surrounding whitespace
+            lambda s: '"' + s + '"',                      # quoted as a whole
+            lambda s: "'" + s + "'",
+            lambda s: base64.b64encode(s.encode()).decode(),  # the file base64-encoded
+            lambda s: "\n".join(                          # base64 wrapped at 76 columns, as `base64` prints it
+                [base64.b64encode(s.encode()).decode()[i:i + 76] for i in range(0, len(base64.b64encode(s.encode())), 76)]
+            ),
+            lambda s: base64.urlsafe_b64encode(s.encode()).decode().rstrip("="),
+        ],
+    )
+    def test_a_key_pasted_with_a_bom_quotes_whitespace_or_base64_is_still_read(self, tmp_path, wrap):
+        raw = throwaway_key_json()
+        mgr = self._mgr(tmp_path, gcp_service_account_key=wrap(raw))
+        assert mgr._load_service_account_info() == json.loads(raw)
+
+    def test_an_unreadable_inline_key_is_described_by_length_and_first_character_only(self, tmp_path):
+        mgr = self._mgr(tmp_path, gcp_service_account_key="C:/keys/fake-key-SECRETPART.json")
+        with pytest.raises(SheetError) as caught:
+            mgr._build_client()
+        text = str(caught.value)
+        assert "not valid JSON" in text and "does not begin with {" in text and "32 character(s)" in text
+        assert "SECRETPART" not in text and "keys" not in text
+        mgr = self._mgr(tmp_path, gcp_service_account_key="{broken fake-key-SECRETPART")
+        with pytest.raises(SheetError) as caught:
+            mgr._build_client()
+        assert "begins with {" in str(caught.value) and "SECRETPART" not in str(caught.value)
+
+    def test_base64_that_does_not_decode_to_an_object_is_not_treated_as_the_key(self, tmp_path):
+        mgr = self._mgr(tmp_path, gcp_service_account_key=base64.b64encode(b"fake-key-SECRETPART").decode())
+        with pytest.raises(SheetError) as caught:
+            mgr._build_client()
+        assert "not valid JSON" in str(caught.value) and "SECRETPART" not in str(caught.value)
 
     def test_missing_fields_are_listed_by_name_only(self, tmp_path):
         mgr = self._mgr(tmp_path, gcp_service_account_key=json.dumps({"type": "service_account", "client_email": "a@b.invalid"}))

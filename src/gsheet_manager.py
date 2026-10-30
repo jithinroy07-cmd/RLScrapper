@@ -34,6 +34,8 @@ here are about not hurting what a person put there:
 
 from __future__ import annotations
 
+import base64
+import binascii
 import json
 import logging
 import re
@@ -93,6 +95,33 @@ SCOPES = (
 )
 SHEETS_ONLY_SCOPES = (SHEETS_SCOPE,)
 REQUIRED_KEY_FIELDS = ("client_email", "private_key", "token_uri")
+
+
+def _unwrap_key_text(text: str) -> str:
+    """
+    The service-account JSON as pasted by a person, made parseable where the intent is clear: a
+    byte-order mark and surrounding whitespace are dropped, one pair of quotes wrapped around the
+    whole object is removed, and a value that is the base64 encoding of the file (a common way to
+    paste a multi-line file safely) is decoded. Anything else is returned as it came, so the JSON
+    check still decides. Nothing here logs or raises.
+    """
+    cleaned = text.lstrip("\ufeff").strip()
+    for quote in ('"', "'"):
+        if len(cleaned) >= 2 and cleaned[0] == quote and cleaned[-1] == quote and cleaned[1:2] == "{":
+            cleaned = cleaned[1:-1].strip()
+            break
+    if cleaned.startswith("{"):
+        return cleaned
+    compact = "".join(cleaned.split())
+    if compact and re.fullmatch(r"[A-Za-z0-9+/=_-]+", compact):
+        try:
+            decoded = base64.b64decode(compact.replace("-", "+").replace("_", "/") + "=" * (-len(compact) % 4), validate=True)
+            candidate = decoded.decode("utf-8-sig").strip()
+        except (binascii.Error, ValueError):
+            return cleaned
+        if candidate.startswith("{"):
+            return candidate
+    return cleaned
 HTTP_TIMEOUT_SECONDS = (10.0, 120.0)  # (connect, read); gspread's own default is no timeout at all
 
 # --- retry policy ---------------------------------------------------------------
@@ -517,10 +546,16 @@ class SheetManager:
                 # The path is a typed setting (and a local path); only the file's role and the error class show.
                 raise self._fail(f"cannot read the service-account file ({type(exc).__name__})") from None
             origin = "the service-account file"
+        text = _unwrap_key_text(text)
         try:
             info = json.loads(text)
         except ValueError:
-            raise self._fail(f"{origin} is not valid JSON; it must be the full key file from Google Cloud") from None
+            # A safe diagnosis only: the length and whether the value begins like a JSON object, never its text.
+            shape = "begins with {" if text.startswith("{") else "does not begin with {"
+            raise self._fail(
+                f"{origin} is not valid JSON; it must be the full key file from Google Cloud "
+                f"(the value given is {len(text)} character(s) long and {shape}; a base64 encoding of the file is accepted too)"
+            ) from None
         if not isinstance(info, dict):
             raise self._fail(f"{origin} is not a JSON object")
         missing = [f for f in REQUIRED_KEY_FIELDS if not isinstance(info.get(f), str) or not info[f].strip()]
