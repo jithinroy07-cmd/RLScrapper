@@ -1079,6 +1079,19 @@ class TestNormalizeFeature:
         assert pins[2]["label"] == "مشروع" and pins[3]["label"] == "dld:dubai:77" and pins[4]["label"] == "Unnamed project"
         assert pins[5]["name"] == "" and pins[6]["name"] == "<img src=x onerror=alert(1)>"   # kept as text, never as markup
 
+    def test_a_project_without_an_english_name_is_headed_in_english_with_the_arabic_name_kept(self, pure):
+        pins = self.norm(
+            pure,
+            feature(name="", name_ar="مشروع", master_project="Test Community", area="Test Area", registry="DLD", registry_no="2688"),
+            feature(name="", name_ar="مشروع", area="Test Area", registry="DLD", registry_no="2689"),
+            feature(name="", name_ar="مشروع", registry="DLD", registry_no="2690"),
+            feature(name="", name_ar="مشروع", area="Test Area"),
+            feature(name="Alpha Tower", name_ar="برج ألفا", area="Test Area", registry="DLD", registry_no="1"),
+        )
+        assert [p["label"] for p in pins] == [
+            "Test Community · DLD 2688", "Test Area · DLD 2689", "DLD 2690", "Test Area", "Alpha Tower"]
+        assert all(p["nameAr"] in ("مشروع", "برج ألفا") for p in pins)  # the Arabic name stays on the pin, for the popup and the search
+
     def test_hostile_property_names_do_no_harm(self, pure):
         hostile = feature()
         hostile["properties"]["__proto__"] = {"polluted": True}
@@ -1447,6 +1460,16 @@ def sample_collection() -> dict:
     return exp.build_geojson(rows, listings, generated_at="2026-10-25T03:00:00Z", unreadable_rows=0)
 
 
+def arabic_only_collection() -> dict:
+    """# SYNTHETIC: one project with an English name and one with an Arabic name only, as the DLD register mostly has."""
+    rows = [
+        registry_row(registry_project_no="1", project_name_en="Alpha Tower", area_en="Business Bay", project_name_ar="برج ألفا"),
+        registry_row(registry_project_no="6", project_name_en="", project_name_ar="مشروع بلا اسم إنجليزي", master_project="Test Community",
+                     location_precision="community", latitude=25.19, longitude=55.26, status="ACTIVE"),
+    ]
+    return exp.build_geojson(rows, {}, generated_at="2026-10-25T03:00:00Z", unreadable_rows=0)
+
+
 @pytest.fixture(scope="module")
 def page(tmp_path_factory, source, parsed, script):
     harness = tmp_path_factory.mktemp("page") / "harness.cjs"
@@ -1524,7 +1547,7 @@ class TestPageWithData:
     def test_a_popup_shows_the_listing_with_its_source_and_a_safe_link(self, page):
         popup = page(sample_collection(), scenario="return h.popupByName('Alpha Tower');")["result"]
         text = popup["text"]
-        for expected in ("AED 1,200,000 to AED 2,500,000", "Studio to 3 BR", "Apartment", "Q4 2027", "Business Bay", "ACTIVE", "66.7% complete", "120", "as of 2026-10-01", "برج ألفا", "DLD 1"):
+        for expected in ("AED 1,200,000 to AED 2,500,000", "Studio to 3 BR", "Apartment", "Q4 2027", "Business Bay", "ACTIVE", "66.7% complete", "120", "as of 2026-10-01", "DLD 1"):
             assert expected in text, expected
         assert popup["anchors"] == [{"href": "https://example.com/alpha", "target": "_blank", "rel": "noopener noreferrer", "text": "example.com"}]
         assert popup["marker"]["popupOpts"] == {"maxWidth": 320}
@@ -1535,9 +1558,16 @@ class TestPageWithData:
         assert "AED" not in popup["text"]
 
     def test_arabic_text_is_set_as_a_right_to_left_block(self, page):
-        popup = page(sample_collection(), scenario="return h.popupByName('Alpha Tower');")["result"]
+        # A project with no English name is headed by its master project and registry number, in English,
+        # with its Arabic name beneath as a right-to-left block.
+        popup = page(arabic_only_collection(), scenario="return h.popupByName('Test Community · DLD 6');")["result"]
         arabic = [n for n in _flatten(popup["tree"]) if n.get("attrs", {}).get("lang") == "ar"]
-        assert arabic and arabic[0]["attrs"]["dir"] == "auto"
+        assert arabic and arabic[0]["attrs"]["dir"] == "auto" and "مشروع بلا اسم إنجليزي" in popup["text"]
+
+    def test_a_project_with_an_english_name_shows_no_arabic_line(self, page):
+        popup = page(arabic_only_collection(), scenario="return h.popupByName('Alpha Tower');")["result"]
+        assert not [n for n in _flatten(popup["tree"]) if n.get("attrs", {}).get("lang") == "ar"]
+        assert "برج ألفا" not in popup["text"]
 
 
 def _flatten(node):

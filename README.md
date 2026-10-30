@@ -173,6 +173,8 @@ Exit codes: 0 done or nothing to do, 1 failed (read the message), 2 refused by a
 
 **Known limit: free text.** The export cannot recognise the names of people, or digits spelled out in words, in free text, and the contact filter above is applied to the handover note only. Free text in the sheet is therefore reviewed by an analyst before the map is published. Registry names, developers and areas are published as the registry gave them, with control characters removed and a length cap.
 
+**Names are English first.** Most Dubai projects have no English name in the official register (209 of the 3481 in the October 2026 register do). A pin with an English name is headed by it and shows no Arabic. A pin without one is headed by its English master project or area plus its registry number (for example `Jumeirah Village Circle · DLD 2688`), with the Arabic name beneath in smaller right-to-left text; the Arabic name heads a pin only when nothing English exists at all. The Arabic name stays in the file and in the search either way, because it is the project's only name. Developer names come from the register as given, which for Dubai is Arabic.
+
 Precision is always visible: an exact pin is a solid marker, and a community or area pin is a hollow one whose popup says the location is approximate. A pin with coordinates but no recorded precision is exported as `unknown` and drawn as approximate as well.
 
 **Attribution.** Map tiles, the emirate boundaries used to check pins, and geocoding results come from OpenStreetMap, which is available under the Open Database Licence (ODbL). Any published copy of the map must keep the "OpenStreetMap contributors" credit visible. Dubai Municipality boundary data is not used, because public use needs its written approval.

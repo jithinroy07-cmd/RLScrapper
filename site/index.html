@@ -10,7 +10,7 @@
   to paste in.
   img-src has data: because Leaflet swaps cancelled tiles for a one-pixel data image.
 -->
-<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'self' https://cdnjs.cloudflare.com 'sha256-OE8cLOx7t+UBBRwKoucWRlOFkL/ekRLW3vZhQu9971c='; style-src 'self' https://cdnjs.cloudflare.com 'sha256-AjNdKm962lR+1hWNcBA4e6LyJJ1WMRl4N+hSzTL9Lpc='; img-src 'self' data: https://tile.openstreetmap.org; connect-src 'self'; base-uri 'none'; form-action 'none'; object-src 'none'">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'self' https://cdnjs.cloudflare.com 'sha256-0YPzGaGhpo3663Xd1j4T1YZtBGPtWOChJ6dYVFfur6g='; style-src 'self' https://cdnjs.cloudflare.com 'sha256-AjNdKm962lR+1hWNcBA4e6LyJJ1WMRl4N+hSzTL9Lpc='; img-src 'self' data: https://tile.openstreetmap.org; connect-src 'self'; base-uri 'none'; form-action 'none'; object-src 'none'">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>UAE Projects Map</title>
 <link rel="icon" href="data:,">
@@ -461,7 +461,12 @@
       pin.priceFrom = pin.priceTo = pin.pricePerSqft = pin.bedsMin = pin.bedsMax = null;
       pin.types = []; pin.handover = ''; pin.asOf = '';
     }
-    pin.label = pin.name || pin.nameAr || pin.key || 'Unnamed project';
+    // English first. Most DLD projects have no English name in the register, so a pin without one is headed
+    // by its English master project or area plus its registry number, and its Arabic name is shown beneath;
+    // the Arabic name heads the pin only when nothing English exists at all.
+    pin.englishHeading = pin.name || [pin.master || pin.area, pin.registry && pin.registryNo ? pin.registry + ' ' + pin.registryNo : '']
+      .filter(function (s) { return s; }).join(' \u00b7 ');
+    pin.label = pin.englishHeading || pin.nameAr || pin.key || 'Unnamed project';
     pin.haystack = foldText([pin.name, pin.nameAr, pin.developer, pin.key, pin.registry + ' ' + pin.registryNo,
       pin.area, pin.master].join(' '));
     return pin;
@@ -668,7 +673,7 @@
   function popupNode(pin) {
     var root = el('div', { class: 'pop' });
     root.appendChild(el('h3', { text: pin.label }));
-    if (pin.nameAr && pin.nameAr !== pin.label) root.appendChild(el('div', { class: 'ar', dir: 'auto', lang: 'ar', text: pin.nameAr }));
+    if (!pin.name && pin.nameAr && pin.nameAr !== pin.label) root.appendChild(el('div', { class: 'ar', dir: 'auto', lang: 'ar', text: pin.nameAr }));
     root.appendChild(el('div', { class: 'meta', text: joinParts([pin.developer, pin.emirate, pin.area, pin.master], ' · ') }));
 
     var progress = joinParts([pin.status, pin.percent !== null ? trimNumber(pin.percent, 1) + '% complete' : ''], ' · ');
