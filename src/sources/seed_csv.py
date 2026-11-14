@@ -16,7 +16,8 @@ list yet, gets into the registry, so it is read strictly:
     them is dropped and counted, never repaired.
   * A SEED row never has a registry id (models.RegistryRow.registry_key): a hand
     typed number has no authority behind it.
-  * The file may legitimately hold no rows (it ships header-only). It may not be
+  * The file may legitimately hold no rows (it shipped header-only until 14 November
+    2026, when the first Sharjah rows went in). It may not be
     missing, unreadable, or have a header we cannot use: those are SourceError.
   * Two rows for one project: the later line wins, as in the listing seed. A
     hand-maintained file is append-and-correct, so the later line is the correction.

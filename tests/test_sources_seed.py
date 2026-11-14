@@ -61,13 +61,20 @@ def csv_quote(cell: str) -> str:
 # ---------------------------------------------------------------------------
 # The files that ship with the repository
 # ---------------------------------------------------------------------------
-def test_the_shipped_registry_seed_is_header_only_and_reads_as_zero_rows():
+def test_the_shipped_registry_seed_is_the_sharjah_list_with_developers_and_sources():
+    # The seed ships the Sharjah projects whose developer could be sourced (14 November 2026): the SRERD list
+    # gives names and areas only, so each row here carries the developer and the page it was confirmed on.
     shipped = DATA_DIR / "seed_registry.csv"
-    assert shipped.read_text(encoding="utf-8").splitlines() == [HEADER]
+    lines = shipped.read_text(encoding="utf-8").splitlines()
+    assert lines[0] == HEADER and len(lines) > 1
     result = SeedCsvAdapter(today=TODAY).fetch()
-    assert result.rows == [] and result.candidates == [] and result.source == "seed_csv"
-    assert result.notes == ["seed_registry.csv has no rows (header only)"]
-    check_row_count("seed_csv", 0, None, expects_rows=False, allow_drop=False)
+    assert result.source == "seed_csv" and result.candidates == []
+    assert len(result.rows) == len(lines) - 1, result.notes  # every shipped row is usable: none dropped
+    assert all(r.emirate == "Sharjah" and r.registry == "SEED" and r.developer and r.project_name_en for r in result.rows)
+    assert all(r.source_dataset.startswith("https://") for r in result.rows)
+    assert len({r.project_key for r in result.rows}) == len(result.rows)  # no two rows for one project
+    assert result.notes == [f"read {len(result.rows)} data row(s) from seed_registry.csv"]
+    check_row_count("seed_csv", len(result.rows), None, expects_rows=False, allow_drop=False)
 
 
 def test_the_default_path_is_the_shipped_file():

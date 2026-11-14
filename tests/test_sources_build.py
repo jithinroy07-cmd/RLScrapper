@@ -154,10 +154,11 @@ def test_the_three_switchable_adapters_refuse_to_fetch_when_off_and_say_why():
         assert adapter.name in str(info.value) and adapter.skip_reason(cfg) in str(info.value)
 
 
-def test_the_seed_always_runs_and_the_shipped_seed_is_a_quiet_zero():
+def test_the_seed_always_runs_and_the_shipped_seed_reads_cleanly():
     (seed,) = [a for a in build_adapters(make_cfg()) if a.name == "seed_csv"]
     result = seed.fetch()
-    assert result.rows == [] and result.source == "seed_csv"
+    assert result.source == "seed_csv" and result.rows and all(r.emirate == "Sharjah" for r in result.rows)
+    assert seed.expects_rows is False  # a pruned or emptied seed is never a failure
     check_row_count("seed_csv", len(result.rows), None, expects_rows=seed.expects_rows, allow_drop=False)
 
 

@@ -1016,20 +1016,21 @@ def test_rows_in_no_feed_this_run_are_kept(tmp_path, caplog):
     assert "2 kept" in caplog.text
 
 
-def test_real_adapters_with_nothing_configured_make_a_green_run_with_a_loud_warning(tmp_path, caplog):
+def test_real_adapters_with_nothing_configured_make_a_green_run_from_the_shipped_seed(tmp_path, caplog):
+    # Nothing configured means no Dubai feed, no Sharjah list and no news; the shipped seed still delivers its
+    # Sharjah rows (since 14 November 2026), so the run is green and the "no source" warning does not fire.
     from src.sources import build_adapters
 
     env = make_env(tmp_path, data_dubai_api_key="", data_dubai_api_secret="", gemini_api_key="")
     adapters = build_adapters(env.cfg, today=TODAY)
     assert go(env, adapters) == 0
-    loud = [r for r in caplog.records if r.levelno == logging.WARNING and "NO SOURCE PRODUCED" in r.getMessage()]
-    assert len(loud) == 1
-    text = loud[0].getMessage()
-    assert "nothing will change" in text and "DATA_DUBAI_API_KEY" in text and "ENABLE_SRERD" in text
+    assert "NO SOURCE PRODUCED" not in caplog.text
     statuses = {name: info["status"] for name, info in source_info(env.last_log()).items()}
     assert statuses["dld_projects"] == "skipped" and statuses["srerd_projects"] == "disabled"
     assert statuses["seed_csv"] == "ok" and statuses["gemini_news"] == "disabled"
-    assert env.registry() == {}
+    registry = env.registry()
+    assert registry and all(key.startswith("name:sharjah:") for key in registry)
+    assert {row["Emirate"] for row in registry.values()} == {"Sharjah"} and {row["Registry"] for row in registry.values()} == {"SEED"}
 
 
 def test_the_no_source_warning_is_absent_when_a_source_delivered(tmp_path, caplog):
