@@ -10,7 +10,7 @@
   to paste in.
   img-src has data: because Leaflet swaps cancelled tiles for a one-pixel data image.
 -->
-<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'self' https://cdnjs.cloudflare.com 'sha256-0YPzGaGhpo3663Xd1j4T1YZtBGPtWOChJ6dYVFfur6g='; style-src 'self' https://cdnjs.cloudflare.com 'sha256-AjNdKm962lR+1hWNcBA4e6LyJJ1WMRl4N+hSzTL9Lpc='; img-src 'self' data: https://tile.openstreetmap.org; connect-src 'self'; base-uri 'none'; form-action 'none'; object-src 'none'">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'self' https://cdnjs.cloudflare.com 'sha256-sp422fqXw0TSQBQ7TjEe/Sy4Gu0P737ZRaIy4kxQT+g='; style-src 'self' https://cdnjs.cloudflare.com 'sha256-AjNdKm962lR+1hWNcBA4e6LyJJ1WMRl4N+hSzTL9Lpc='; img-src 'self' data: https://a.basemaps.cartocdn.com https://b.basemaps.cartocdn.com https://c.basemaps.cartocdn.com https://d.basemaps.cartocdn.com; connect-src 'self'; base-uri 'none'; form-action 'none'; object-src 'none'">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>UAE Projects Map</title>
 <link rel="icon" href="data:,">
@@ -637,10 +637,14 @@
   // ---- map ----
   function initMap() {
     map = L.map('map', { zoomControl: true, preferCanvas: true }).setView([25.2, 55.3], 9);
-    L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
+    // CARTO's Voyager basemap: OpenStreetMap data rendered with English (Latin) place labels, which the
+    // standard OpenStreetMap style does not do for the UAE (it labels in Arabic). No key; the tile hosts
+    // are the only image sources the policy allows besides this site. Credit both OSM and CARTO.
+    L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png', {
+      subdomains: 'abcd',
       maxZoom: 19,
       attribution: 'Map data &copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors, ' +
-        '<a href="https://opendatacommons.org/licenses/odbl/1-0/">ODbL</a>'
+        '<a href="https://opendatacommons.org/licenses/odbl/1-0/">ODbL</a>; tiles &copy; <a href="https://carto.com/attributions">CARTO</a>'
     }).addTo(map);
     // No disableClusteringAtZoom on purpose: every project pinned at a community
     // centroid shares ONE coordinate, and only spiderfying can pull those apart.

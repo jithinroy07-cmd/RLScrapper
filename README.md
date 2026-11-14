@@ -163,7 +163,7 @@ Exit codes: 0 done or nothing to do, 1 failed (read the message), 2 refused by a
 
 ## The map
 
-`site/index.html` is a static page (Leaflet with marker clustering, OpenStreetMap tiles) that reads `site/pins.geojson`. `python -m scripts.export_map_pins` builds that file from the sheet; it is git-ignored and regenerated on every run. `--out PATH` changes the file, and `--min-pins N` makes it fail, and keep the old file, when fewer than N pins come out. The export needs `SPREADSHEET_ID` and exits 1 without it; `--allow-sheet-by-name` lifts that and lets the sheet code look up, or create, a sheet by name, which you almost never want.
+`site/index.html` is a static page (Leaflet with marker clustering, CARTO Voyager tiles rendered from OpenStreetMap data with English labels) that reads `site/pins.geojson`. `python -m scripts.export_map_pins` builds that file from the sheet; it is git-ignored and regenerated on every run. `--out PATH` changes the file, and `--min-pins N` makes it fail, and keep the old file, when fewer than N pins come out. The export needs `SPREADSHEET_ID` and exits 1 without it; `--allow-sheet-by-name` lifts that and lets the sheet code look up, or create, a sheet by name, which you almost never want.
 
 **Which rows become pins.** A row is drawn only if it has both coordinates, the point is inside the coarse box that holds both emirates, the registry gave an emirate that is exactly Dubai or Sharjah, and the point lies strictly inside that emirate's boundary polygon (a point exactly on the boundary line is inside neither). The export is the last stop before the public file, so this applies to a geocoder result, a `Geocode_Overrides` pin and a hand-typed coordinate alike, and the emirate is never guessed from the point. A row that fails is counted by reason in the file's `meta.dropped` block (`no_coordinates`, `half_written_coordinates`, `out_of_range`, `unknown_emirate`, `outside_emirate`), as is a row that shares its project key with a better-placed row (`duplicate_key`). The log gives these counts and never names the rows.
 
@@ -177,7 +177,7 @@ Exit codes: 0 done or nothing to do, 1 failed (read the message), 2 refused by a
 
 Precision is always visible: an exact pin is a solid marker, and a community or area pin is a hollow one whose popup says the location is approximate. A pin with coordinates but no recorded precision is exported as `unknown` and drawn as approximate as well.
 
-**Attribution.** Map tiles, the emirate boundaries used to check pins, and geocoding results come from OpenStreetMap, which is available under the Open Database Licence (ODbL). Any published copy of the map must keep the "OpenStreetMap contributors" credit visible. Dubai Municipality boundary data is not used, because public use needs its written approval.
+**Attribution.** The emirate boundaries used to check pins, the geocoding results and the data behind the map tiles come from OpenStreetMap, which is available under the Open Database Licence (ODbL). Any published copy of the map must keep the "OpenStreetMap contributors" credit visible. The tiles themselves are CARTO's free Voyager basemap (`basemaps.cartocdn.com`), chosen because it labels places in English where the standard OpenStreetMap style labels the UAE in Arabic; it needs no key, and the page credits CARTO beside OpenStreetMap as its attribution terms require. CARTO offers these basemaps free for non-commercial use and for low-volume public pages; use for a commercial product is subject to CARTO's terms, which the owner should confirm before any such use ("Open decisions"). Dubai Municipality boundary data is not used, because public use needs its written approval.
 
 ## Open decisions (not code)
 
@@ -187,6 +187,7 @@ The owner must settle these; none can be done by the scraper.
 2. Get written clarification of the Dubai Land Department data licence, ideally before the first public deploy, and in any case before any commercial use. The catalogue says "Not Specified" and the site terms lean non-commercial. Deciding to publish does not answer this; going ahead without it is the owner's risk.
 3. Decide whether to test the Sharjah list with one supervised request, and who maintains the seed file.
 4. Choose a licensed source for prices, bedrooms and handover dates, after checking that its terms allow public display.
+6. **Confirm the basemap terms if the map becomes commercial.** The map's tiles are CARTO's free Voyager basemap, used under its free tier with attribution (14 November 2026, chosen for English labels). That tier is meant for non-commercial and low-volume use; a commercial product needs CARTO's terms checked, or a different English-labelled tile source.
 5. **Done (14 November 2026): the map is published on GitHub Pages.** The decision was taken on 27 October 2026 and the owner switched it on with `DEPLOY_MAP` once the register had been geocoded. The licence question in item 2 is still open; publishing did not settle it.
 
 ## Project layout
