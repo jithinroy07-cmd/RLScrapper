@@ -80,7 +80,7 @@ On the same page, open the "Variables" tab. A variable you do not create keeps i
 
 | Variable | Purpose |
 |---|---|
-| `ENABLE_SRERD` | `true` turns on the Sharjah list source. Off by default; it is unverified. |
+| `ENABLE_SRERD` | `true` turns on the Sharjah list source. Off by default; the live list answered once, on 14 November 2026, with 104 projects. Set it after a local dry run with the same setting shows `srerd_projects: ok`. |
 | `ENABLE_GEMINI_NEWS` | `true` turns on news discovery into `Launch_Candidates`. Off by default. |
 | `GEMINI_MODEL` | The model name for news discovery. No default is built in; set it when you enable the feature. |
 | `REQUIRE_SOURCES` | Comma-separated source names that must succeed, for example `dld_projects`. A required source that is skipped or switched off fails the run, and a name this scraper does not have stops the run before any work (exit 2). Set this once the Dubai key works. |

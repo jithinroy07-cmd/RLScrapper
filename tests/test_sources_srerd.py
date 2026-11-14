@@ -450,3 +450,44 @@ def test_credential_shaped_text_in_an_error_body_is_scrubbed_anyway():
 def test_a_zero_placeholder_in_an_otherwise_real_run_is_still_a_real_id_run():
     rows = parse_srerd_records([project(i, f"Test {i}") for i in (0, 11, 12, 13, 14, 15)], today=TODAY)
     assert [r.registry_project_no for r in rows] == ["11", "12", "13", "14", "15"]
+
+
+# ---------------------------------------------------------------------------
+# The shape the live list answered with on 14 November 2026 (synthetic values, real column names)
+# ---------------------------------------------------------------------------
+def live_shape():
+    return load_fixture("srerd_live_shape.json")
+
+
+def test_the_live_shape_maps_names_areas_developer_status_and_percentage():
+    tally = RowTally()
+    rows = parse_srerd_records(live_shape()["data"], today=TODAY, tally=tally)
+    by_id = {r.registry_project_no: r for r in rows}
+    assert sorted(by_id) == ["12", "40", "41", "5", "7"]  # the unkeyed row has no id and no developer: dropped
+    first = by_id["5"]
+    assert (first.project_name_en, first.project_name_ar) == ("Test Complex 5", "مجمع اختبار (5)")
+    assert (first.area_en, first.area_ar) == ("TEST AREA INDUSTRIAL", "منطقة اختبار صناعية")
+    assert first.emirate == "Sharjah" and first.registry == "SRERD" and first.project_key == "srerd:sharjah:5"
+    full = by_id["12"]
+    assert full.developer == "Test Developer LLC"  # the English owner column wins over the Arabic one
+    assert full.status == "Under Construction" and full.percent_completed == 45.5
+    arabic_only = by_id["40"]
+    assert arabic_only.project_name_en == "" and arabic_only.project_name_ar == "مساكن اختبار"
+    assert arabic_only.area_en == "" and arabic_only.area_ar == "منطقة اختبار"  # the bare areaName is Arabic: routed to the AR column
+    assert arabic_only.developer == "مطور اختبار ذ.م.م"  # only the Arabic owner column: kept, as Dubai keeps Arabic developers
+    assert by_id["41"].status == "منجز" and by_id["41"].percent_completed == 100
+    assert tally.dropped == 1 and "no usable identity" in tally.dropped_summary()
+
+
+def test_the_live_envelope_is_read_whole_with_its_stated_total(caplog):
+    session = FakeSession([FakeResponse(200, live_shape())])
+    adapter = SrerdProjectsAdapter(make_cfg(ENABLE_SRERD="true"), session=session, today=TODAY, sleep=Sleeps())
+    result = adapter.fetch()
+    assert len(result.rows) == 5 and result.notes[0] == "fetched 6 raw row(s)"
+    assert session.calls[0].method == "POST" and session.calls[0].kwargs["json"] == {}
+
+
+def test_the_live_ids_are_not_mistaken_for_row_positions():
+    # 5, 7, 12, 40, 41 are the sampled kind of id: numeric, sparse, not 1..N
+    rows = parse_srerd_records(live_shape()["data"], today=TODAY)
+    assert all(r.registry_project_no for r in rows)

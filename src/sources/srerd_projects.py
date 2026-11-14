@@ -2,12 +2,17 @@
 Sharjah registry source: the Sharjah Real Estate Registration Department (SRERD)
 "List of Projects" page (docs/DESIGN.md section 4).
 
-Status: UNVERIFIED and off by default (ENABLE_SRERD=true). The research digest
-found, in the department's own page script, a POST to the cms-proxy projects
-endpoint and a column list of project name (AR/EN), area (AR/EN) and ownership
-type. Nobody has seen a response, so the shape is parsed tolerantly and anything
-unrecognised is a SourceError rather than a guess: an unfamiliar answer, zero rows,
-fewer rows than the answer itself says it has, or rows that cannot be keyed.
+Status: off by default (ENABLE_SRERD=true); the live answer was SEEN ONCE, on 14 November
+2026, from a supervised local run. One POST with an empty JSON body answered 200 with an
+envelope (succeeded, message, data, totalRecords, rows, links) whose `data` list held 104
+projects of 25 columns: proId (a stable id; the sampled values were not row positions),
+proName / proNameE (Arabic and English names), areaName / areaEName (Arabic and English
+area), ownerName / ownerEname (the developer), proStatus / proEstatus, completionPercentage,
+usFlag / usFlagDesc (ownership type, Arabic text), and others that were null in the sampled
+rows (proNum, projectCode, developerCode, certificateExpiryDate, images, contract). The
+aliases below carry those spellings. The shape is still parsed tolerantly and anything
+unrecognised is a SourceError rather than a guess: an unfamiliar answer, zero rows, fewer
+rows than the answer itself says it has, or rows that cannot be keyed.
 
 Identity is the weak point, and the reason this adapter is stricter than it looks:
 
@@ -59,29 +64,37 @@ logger = logging.getLogger(__name__)
 
 SOURCE_NAME = "srerd_projects"
 
-# From the research digest: found in the department's page script. Not called by anyone yet.
+# From the research digest: found in the department's page script. Answered 200 on 14 November 2026.
 SRERD_PROJECTS_URL = "https://cms-proxy.shjrerd.gov.ae/api/Projects/GetProjects"
-# UNVERIFIED: the request body the endpoint wants. An empty object is the smallest thing
-# that can work; if the service needs paging or filter fields it will answer with an
-# error or no rows, and either way the adapter fails loudly.
+# An empty object was enough on 14 November 2026 (104 rows, no paging). If the service ever
+# needs paging or filter fields it will answer with an error or a partial list, and either
+# way the adapter fails loudly.
 SRERD_REQUEST_BODY: Mapping[str, Any] = {}
 SRERD_TIMEOUT = (30, 120)
 MAX_DROPPED_SHARE = 0.5
 MIN_POSITIONAL_ROWS = 5  # fewer rows than this and "1..N" proves nothing
 
 NAME_EN_ALIASES = (
-    "projectnameen", "projectnameenglish", "projecten", "projectenglishname",
+    "pronamee", "pronameen", "projectnameen", "projectnameenglish", "projecten", "projectenglishname",
     "nameen", "enname", "englishname", "titleen",
 )
 NAME_AR_ALIASES = (
-    "projectnamear", "projectnamearabic", "projectar", "projectarabicname",
+    "pronamea", "pronamear", "projectnamear", "projectnamearabic", "projectar", "projectarabicname",
     "namear", "arname", "arabicname", "titlear",
 )
-NAME_GENERIC_ALIASES = ("projectname", "name", "title")
-AREA_EN_ALIASES = ("areanameen", "areaen", "areaname", "locationen", "districten", "area")
+# The live list's bare proName is Arabic, so a generic name is routed by script (see _row_from_record).
+NAME_GENERIC_ALIASES = ("proname", "projectname", "name", "title")
+# The live list's areaEName is English and its bare areaName is Arabic, so a generic area column is
+# routed by script, as a generic name is.
+AREA_EN_ALIASES = ("areaename", "areanameen", "areaen", "locationen", "districten")
 AREA_AR_ALIASES = ("areanamear", "areaar", "locationar", "districtar")
-DEVELOPER_ALIASES = ("developername", "developernameen", "developeren", "developer")
-STATUS_ALIASES = ("projectstatus", "status")
+AREA_GENERIC_ALIASES = ("areaname", "area", "location", "district")
+# The live list calls the developer the owner (ownerEname English, ownerName Arabic); English first.
+DEVELOPER_ALIASES = (
+    "ownerename", "ownernameen", "developername", "developernameen", "developeren", "developer", "ownername", "owner",
+)
+STATUS_ALIASES = ("proestatus", "projectstatus", "status", "prostatus")
+PERCENT_ALIASES = ("completionpercentage", "percentcompleted", "percentcomplete")
 # A bare "id" is deliberately absent (see the module docstring).
 ID_ALIASES = ("proid", "projectid", "projectno", "projectnumber", "projectcode")
 
@@ -203,12 +216,20 @@ def _row_from_record(
     if not (name_en or name_ar):
         tally.drop(R_NO_NAME)
         return None
+    area_en = first_match(rec, AREA_EN_ALIASES, _place_text)
+    area_ar = first_match(rec, AREA_AR_ALIASES, _place_text)
+    generic_area = first_match(rec, AREA_GENERIC_ALIASES, _place_text)
+    if generic_area:
+        if is_arabic_only(generic_area):
+            area_ar = area_ar or generic_area
+        else:
+            area_en = area_en or generic_area
     texts = {
         "project_name_en": name_en,
         "project_name_ar": name_ar,
         "developer": first_match(rec, DEVELOPER_ALIASES, as_text),
-        "area_en": first_match(rec, AREA_EN_ALIASES, _place_text),
-        "area_ar": first_match(rec, AREA_AR_ALIASES, _place_text),
+        "area_en": area_en,
+        "area_ar": area_ar,
         "status": first_match(rec, STATUS_ALIASES, as_text),
     }
     if any(value is not None and len(value) > MAX_TEXT_LEN for value in texts.values()):
@@ -219,6 +240,7 @@ def _row_from_record(
             emirate="Sharjah",
             registry="SRERD",
             registry_project_no=number,
+            percent_completed=first_match(rec, PERCENT_ALIASES, as_cell),
             source_dataset=source_dataset,
             first_seen=today_iso,
             last_seen=today_iso,
