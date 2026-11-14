@@ -5,12 +5,15 @@ Sharjah registry source: the Sharjah Real Estate Registration Department (SRERD)
 Status: off by default (ENABLE_SRERD=true); the live answer was SEEN ONCE, on 14 November
 2026, from a supervised local run. One POST with an empty JSON body answered 200 with an
 envelope (succeeded, message, data, totalRecords, rows, links) whose `data` list held 104
-projects of 25 columns: proId (a stable id; the sampled values were not row positions),
+projects of 25 columns: proId (NOT a project id: 104 rows shared 38 values, and the
+buildings of one complex carried 1..20, so it is a sequence inside a developer's list),
 proName / proNameE (Arabic and English names), areaName / areaEName (Arabic and English
 area), ownerName / ownerEname (the developer), proStatus / proEstatus, completionPercentage,
-usFlag / usFlagDesc (ownership type, Arabic text), and others that were null in the sampled
-rows (proNum, projectCode, developerCode, certificateExpiryDate, images, contract). The
-aliases below carry those spellings. The shape is still parsed tolerantly and anything
+usFlag / usFlagDesc (ownership type, Arabic text). In ALL 104 rows the owner, status,
+percentage, proNum, projectCode, developerCode and certificateExpiryDate were null. So the
+live list gives names and areas only: no id and no developer, which is the identity gap the
+README describes, and the reason Sharjah comes from the hand-kept seed file. The aliases
+below carry the spellings seen. The shape is still parsed tolerantly and anything
 unrecognised is a SourceError rather than a guess: an unfamiliar answer, zero rows, fewer
 rows than the answer itself says it has, or rows that cannot be keyed.
 
@@ -114,6 +117,10 @@ R_INVALID = "row failed model validation"
 R_DUPLICATE = "duplicate id (first row kept)"
 A_BAD_ID = "id has characters outside A-Z a-z 0-9 . _ - or is too long; blanked"
 A_POSITIONAL = "ids are exactly 1..N in payload order, which looks like row positions, not stable ids; all ids ignored"
+A_SHARED = "ids repeat across many rows, so they do not identify projects; all ids ignored"
+# Below this share of distinct values among the ids present, the id column is not a per-project id (the live
+# list's proId: 38 distinct values over 104 rows). A genuine feed with a few repeated rows stays well above it.
+MIN_DISTINCT_ID_SHARE = 0.75
 
 _NUMBER_ONLY_RE = re.compile(r"^[\d.,\s]+$")
 
@@ -158,6 +165,12 @@ def _ids_look_positional(ids: Sequence[Optional[str]]) -> bool:
     return all(int(i) == position + 1 for position, i in present) or all(int(i) == position for position, i in present)
 
 
+def _ids_are_shared(ids: Sequence[Optional[str]]) -> bool:
+    """True when the ids present repeat so much that they cannot be per-project ids."""
+    present = [i for i in ids if i is not None]
+    return len(present) >= MIN_POSITIONAL_ROWS and len(set(present)) < MIN_DISTINCT_ID_SHARE * len(present)
+
+
 def parse_srerd_records(
     records: Sequence[Any],
     *,
@@ -181,6 +194,9 @@ def parse_srerd_records(
     ignore_ids = _ids_look_positional(raw_ids)
     if ignore_ids:
         tally.adjust(A_POSITIONAL)
+    elif _ids_are_shared(raw_ids):
+        ignore_ids = True
+        tally.adjust(A_SHARED)
 
     rows: list[RegistryRow] = []
     seen: set[str] = set()

@@ -491,3 +491,41 @@ def test_the_live_ids_are_not_mistaken_for_row_positions():
     # 5, 7, 12, 40, 41 are the sampled kind of id: numeric, sparse, not 1..N
     rows = parse_srerd_records(live_shape()["data"], today=TODAY)
     assert all(r.registry_project_no for r in rows)
+
+
+def test_ids_shared_by_many_different_projects_are_not_ids():
+    # The live list's proId: the buildings of one complex carry 1..20 and unrelated projects share a value.
+    rows_in = []
+    for pid in ("1", "2", "3", "4", "5", "6", "7", "8"):
+        rows_in.append({"proId": pid, "proNameE": f"Test Complex {pid}", "areaEName": "TEST AREA"})
+        rows_in.append({"proId": pid, "proNameE": f"Test Island {pid}", "areaEName": "TEST BAY"})
+        rows_in.append({"proId": pid, "proNameE": f"Test Gardens {pid}", "areaEName": "TEST OASIS"})
+    tally = RowTally()
+    rows = parse_srerd_records(rows_in, today=TODAY, tally=tally)
+    assert rows == []  # no id and no developer: nothing can be keyed
+    assert tally.adjusted_count(srerd.A_SHARED) == 1
+    assert srerd.A_SHARED in " ".join(tally.notes())
+    assert tally.dropped == 24 and "no usable identity" in tally.dropped_summary()
+
+
+def test_a_few_repeated_ids_do_not_disqualify_the_id_column():
+    rows_in = [{"proId": str(i), "proNameE": f"Test Tower {i}", "areaEName": "TEST AREA"} for i in range(10, 30)]
+    rows_in.append({"proId": "10", "proNameE": "Test Tower 10 again", "areaEName": "TEST AREA"})
+    tally = RowTally()
+    rows = parse_srerd_records(rows_in, today=TODAY, tally=tally)
+    assert len(rows) == 20 and tally.dropped_count(srerd.R_DUPLICATE) == 1 and srerd.A_SHARED not in " ".join(tally.notes())
+
+
+def test_the_live_list_as_answered_fails_with_the_identity_reason_not_duplicates():
+    payload = live_shape()
+    # make the fixture look like the live answer: ids shared across different projects, no owner anywhere
+    data = []
+    for pid in ("1", "2", "3", "4", "5", "6"):
+        for suffix in ("Complex", "Island", "Gardens"):
+            data.append({"proId": pid, "proNameE": f"Test {suffix} {pid}", "proName": "اختبار", "areaEName": "TEST AREA", "areaName": "اختبار"})
+    payload["data"], payload["totalRecords"] = data, len(data)
+    session = FakeSession([FakeResponse(200, payload)])
+    adapter = SrerdProjectsAdapter(make_cfg(ENABLE_SRERD="true"), session=session, today=TODAY, sleep=Sleeps())
+    with pytest.raises(SourceError) as info:
+        adapter.fetch()
+    assert "no usable identity" in str(info.value) and "duplicate" not in str(info.value)
