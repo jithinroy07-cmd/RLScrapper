@@ -16,7 +16,7 @@ Read this before relying on a number. Nothing below has been checked against a l
 | Sharjah registry (`srerd_projects`) | **Off by default and unverified.** There is no official feed; the adapter reads one public list page (project name, area, ownership type; no id and no developer) and refuses any response it does not recognise. Turn it on only after a supervised test (`ENABLE_SRERD=true`). |
 | Hand-researched seed (`seed_csv`) | Ships with only a header row. Every row needs a source URL. |
 | News discovery (`gemini_news`) | Off by default (`ENABLE_GEMINI_NEWS=true` turns it on). It only proposes rows for the `Launch_Candidates` tab; a person decides what they are. |
-| Map | The page and the export script are built, and a demo with invented pins has been rendered. **Public hosting on GitHub Pages is decided** (27 October 2026), but nothing is published yet: the owner switches it on with `DEPLOY_MAP` once real data flows (`setup_google_sheets.md`, section 10). |
+| Map | **Live on GitHub Pages since 14 November 2026** at `https://jithinroy07-cmd.github.io/RLScrapper/`, refreshed by every green daily run (`DEPLOY_MAP` is set; `setup_google_sheets.md`, section 10). It shows the 3479 Dubai projects loaded from the 28 October 2026 register download, of which 3467 are located (14 exact, 2820 at community level, 633 at area level) by LocationIQ geocoding. Sharjah has no rows yet. |
 
 ### Known limitations
 
@@ -187,7 +187,7 @@ The owner must settle these; none can be done by the scraper.
 2. Get written clarification of the Dubai Land Department data licence, ideally before the first public deploy, and in any case before any commercial use. The catalogue says "Not Specified" and the site terms lean non-commercial. Deciding to publish does not answer this; going ahead without it is the owner's risk.
 3. Decide whether to test the Sharjah list with one supervised request, and who maintains the seed file.
 4. Choose a licensed source for prices, bedrooms and handover dates, after checking that its terms allow public display.
-5. **Decided (27 October 2026): publish the map publicly on GitHub Pages once real data flows.** What is left is the owner's to do: set the Pages source to "GitHub Actions" and create the `DEPLOY_MAP` variable, as in `setup_google_sheets.md`, section 10.
+5. **Done (14 November 2026): the map is published on GitHub Pages.** The decision was taken on 27 October 2026 and the owner switched it on with `DEPLOY_MAP` once the register had been geocoded. The licence question in item 2 is still open; publishing did not settle it.
 
 ## Project layout
 
