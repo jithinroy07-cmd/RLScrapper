@@ -54,6 +54,7 @@ from src.sources.base import (
     field_key,
     first_date,
     first_match,
+    has_letter,
     is_arabic_only,
     normalise_record,
     parse_json_response,
@@ -134,6 +135,7 @@ ALL_NAME_ALIASES = NAME_EN_ALIASES + NAME_AR_ALIASES + NAME_GENERIC_ALIASES
 
 R_NOT_OBJECT = "row is not an object"
 R_NO_NAME = "no project name"
+R_NO_LETTER_NAME = "project name has no letters (digits, dots or question marks only)"
 # Static text (it is logged and written to the run notes): the rule, never a cell value. The rule is
 # models.identity_slug's: the developer and the project name each need a Latin letter, no letter or
 # number from another script, and none of + # @.
@@ -202,6 +204,11 @@ def _row_from_record(
             name_en = name_en or generic
     if not (name_en or name_ar):
         tally.drop(R_NO_NAME)
+        return None
+    if not has_letter(name_en or "") and not has_letter(name_ar or ""):
+        # The register holds a few names that are only digits or lost characters ("5242", "??????");
+        # a heading like that says nothing, and blank beats invented.
+        tally.drop(R_NO_LETTER_NAME)
         return None
 
     texts = {

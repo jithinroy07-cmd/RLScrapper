@@ -657,9 +657,25 @@ def test_first_date_treats_the_known_no_date_sentinels_quietly():
     assert tally.adjusted_count("epoch-zero date read as blank") == 1
 
 
-@pytest.mark.parametrize("text,expected", [("مشروع", True), ("Tower مشروع", False), ("123", False), ("", False), ("Tower", False)])
+@pytest.mark.parametrize(
+    "text,expected",
+    [
+        ("مشروع", True), ("Tower مشروع", False), ("123", False), ("", False), ("Tower", False),
+        ("A بارك فيوز ريزيدنسيز", True),      # an Arabic name with a Latin building code stays Arabic
+        ("III إلينغتون هاوس", True), ("برج زينيث J1", True),
+        ("ACT ون | ACT تو", False),            # more Latin letters than Arabic: not Arabic-only
+        ("( مايسون الاليزيه I )", True),
+    ],
+)
 def test_is_arabic_only(text, expected):
     assert is_arabic_only(text) is expected
+
+
+@pytest.mark.parametrize("text,expected", [("Tower", True), ("مشروع", True), ("5242", False), (".", False), ("???????? ? ???? 2", False), ("", False), ("J1", True)])
+def test_has_letter(text, expected):
+    from src.sources.base import has_letter
+
+    assert has_letter(text) is expected
 
 
 # (code point, is it in one of the five Arabic blocks the AR column accepts). U+0600 and U+08FF are invisible, so

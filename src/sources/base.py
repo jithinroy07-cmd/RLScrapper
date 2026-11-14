@@ -544,8 +544,19 @@ _LATIN_RE = re.compile(r"[A-Za-z]")
 
 
 def is_arabic_only(text: str) -> bool:
-    """True for text that has Arabic script and no Latin letter (a name for the AR column)."""
-    return bool(_ARABIC_RE.search(text)) and not _LATIN_RE.search(text)
+    """
+    True for a name written in Arabic: it has Arabic letters and they outnumber the Latin ones. A
+    Latin building or phase code inside an Arabic name ("A", "III", "J1": 179 of the 3481 Dubai
+    names in the October 2026 register) does not make the name English; a name with as many Latin
+    letters as Arabic ones, or more, is not Arabic-only.
+    """
+    arabic = len(_ARABIC_RE.findall(text))
+    return arabic > 0 and arabic > len(_LATIN_RE.findall(text))
+
+
+def has_letter(text: str) -> bool:
+    """True when the text has at least one letter of any script. "5242", "." and "??????" are not names."""
+    return any(ch.isalpha() for ch in text)
 
 
 def describe_types(values: Iterable[object]) -> str:

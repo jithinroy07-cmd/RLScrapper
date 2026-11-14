@@ -771,3 +771,16 @@ def test_the_download_setting_is_local_only_and_never_described():
     cfg = file_cfg("some/where.json")
     assert cfg.data_dubai_projects_file == "some/where.json"
     assert "DATA_DUBAI_PROJECTS_FILE" not in cfg.describe() and "some/where" not in str(cfg.describe())
+
+
+def test_an_arabic_name_with_a_latin_building_code_goes_to_the_arabic_column():
+    rows = parse_dld_records([{"project_number": 3001, "project_name": "A بارك فيوز ريزيدنسيز", "developer_name": "مطور"}], today=TODAY)
+    assert (rows[0].project_name_en, rows[0].project_name_ar) == ("", "A بارك فيوز ريزيدنسيز")
+
+
+@pytest.mark.parametrize("name", ["5242", ".", "??????", "???????? ? ???? 2"])
+def test_a_name_with_no_letters_is_no_name_and_the_row_is_dropped_and_counted(name):
+    tally = RowTally()
+    rows = parse_dld_records([{"project_number": 3002, "project_name": name, "developer_name": "مطور"}], today=TODAY, tally=tally)
+    # a lone dot or run of question marks is already read as a placeholder (no name); digits reach the letter check
+    assert rows == [] and tally.dropped == 1 and (tally.dropped_count(dld.R_NO_LETTER_NAME) + tally.dropped_count(dld.R_NO_NAME)) == 1

@@ -549,6 +549,12 @@ class TestContentSecurityPolicy:
             f"the inline {kind} changed: put {expected} in the {directive} of the policy"
         )
 
+    def test_the_results_section_cannot_shrink_under_its_rows(self, parsed):
+        # REGRESSION (seen live): .results shrank to its min-height inside the scrolling panel, its rows overflowed,
+        # and the credits block after it was drawn on top of them.
+        css = parsed.inline_styles[0]
+        assert re.search(r"\.results\s*\{[^}]*flex:\s*1 0 auto", css) and not re.search(r"\.results\s*\{[^}]*min-height", css)
+
     def test_the_dark_theme_beats_the_map_librarys_own_selectors_for_the_controls(self, parsed):
         # Leaflet's sheet uses ".leaflet-container .leaflet-control-attribution" and ".leaflet-bar a:focus";
         # a plainer selector of ours loses to them, leaving a pale attribution strip and a pale focused zoom button.
@@ -1080,6 +1086,23 @@ class TestNormalizeFeature:
         assert len(pins[1]["name"]) == 300
         assert pins[2]["label"] == "مشروع" and pins[3]["label"] == "dld:dubai:77" and pins[4]["label"] == "Unnamed project"
         assert pins[5]["name"] == "" and pins[6]["name"] == "<img src=x onerror=alert(1)>"   # kept as text, never as markup
+
+    def test_an_arabic_name_in_the_english_column_is_treated_as_arabic(self, pure):
+        # The sheet holds, from the October 2026 register, Arabic names with a Latin building code in the English
+        # column, and a few names with no letters at all. Neither may become the English heading.
+        pins = self.norm(
+            pure,
+            feature(name="A بارك فيوز ريزيدنسيز", name_ar="", area="Al Kifaf", registry="DLD", registry_no="10"),
+            feature(name="( مايسون الاليزيه I )", name_ar="", master_project="Jumeirah Village Circle", registry="DLD", registry_no="2905"),
+            feature(name="III إلينغتون هاوس", name_ar="إلينغتون هاوس", registry="DLD", registry_no="11"),
+            feature(name="???????? ? ???? 2", name_ar="", area="Al Thanyah Third", registry="DLD", registry_no="12"),
+            feature(name="5242", name_ar="", area="Marsa Dubai", registry="DLD", registry_no="13"),
+            feature(name="ACT ون | ACT تو", name_ar="", registry="DLD", registry_no="14"),
+        )
+        assert [p["label"] for p in pins] == [
+            "Al Kifaf · DLD 10", "Jumeirah Village Circle · DLD 2905", "DLD 11", "Al Thanyah Third · DLD 12", "Marsa Dubai · DLD 13", "ACT ون | ACT تو"]
+        assert pins[0]["nameAr"] == "A بارك فيوز ريزيدنسيز" and pins[2]["nameAr"] == "إلينغتون هاوس"  # an existing Arabic name is kept
+        assert pins[3]["name"] == "" and pins[3]["nameAr"] == "" and pins[4]["name"] == ""
 
     def test_a_project_without_an_english_name_is_headed_in_english_with_the_arabic_name_kept(self, pure):
         pins = self.norm(
