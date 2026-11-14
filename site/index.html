@@ -10,7 +10,7 @@
   to paste in.
   img-src has data: because Leaflet swaps cancelled tiles for a one-pixel data image.
 -->
-<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'self' https://cdnjs.cloudflare.com 'sha256-0YPzGaGhpo3663Xd1j4T1YZtBGPtWOChJ6dYVFfur6g='; style-src 'self' https://cdnjs.cloudflare.com 'sha256-AjNdKm962lR+1hWNcBA4e6LyJJ1WMRl4N+hSzTL9Lpc='; img-src 'self' data: https://tile.openstreetmap.org; connect-src 'self'; base-uri 'none'; form-action 'none'; object-src 'none'">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'self' https://cdnjs.cloudflare.com 'sha256-H4fK17MWz4OgeW3E2yXNgriuuNV09pT453mxUMki3Cs='; style-src 'self' https://cdnjs.cloudflare.com 'sha256-AjNdKm962lR+1hWNcBA4e6LyJJ1WMRl4N+hSzTL9Lpc='; img-src 'self' data: https://server.arcgisonline.com; connect-src 'self'; base-uri 'none'; form-action 'none'; object-src 'none'">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>UAE Projects Map</title>
 <link rel="icon" href="data:,">
@@ -637,9 +637,14 @@
   // ---- map ----
   function initMap() {
     map = L.map('map', { zoomControl: true, preferCanvas: true }).setView([25.2, 55.3], 9);
-    L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
+    // Esri's World Street Map: place names in English everywhere, streets and communities in English and
+    // Arabic at close zoom, no key (checked in a browser on 14 November 2026). The standard OpenStreetMap
+    // style labels the UAE in Arabic only, and CARTO's basemaps now need a key. Note the z/y/x order.
+    // The pins, boundaries and geocoding still come from OpenStreetMap data, so both credits stay.
+    L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Street_Map/MapServer/tile/{z}/{y}/{x}', {
       maxZoom: 19,
-      attribution: 'Map data &copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors, ' +
+      attribution: 'Tiles &copy; <a href="https://www.esri.com/">Esri</a> and its data partners; ' +
+        'pins and boundaries &copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors, ' +
         '<a href="https://opendatacommons.org/licenses/odbl/1-0/">ODbL</a>'
     }).addTo(map);
     // No disableClusteringAtZoom on purpose: every project pinned at a community

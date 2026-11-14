@@ -64,7 +64,9 @@ PINNED_LIBRARIES = {
     "https://cdnjs.cloudflare.com/ajax/libs/leaflet.markercluster/1.5.3/leaflet.markercluster.min.js":
         "sha384-SIh+qcEBNMda8tT+rx66aCBuWtVYMVzRABqhK4eeQh4pjDHoRdVx8nYU4LQ5eGzI",
 }
-REFERENCED_HOSTS = {"cdnjs.cloudflare.com", "tile.openstreetmap.org", "www.openstreetmap.org", "opendatacommons.org"}
+TILE_HOST = "server.arcgisonline.com"
+TILE_URL = "https://server.arcgisonline.com/ArcGIS/rest/services/World_Street_Map/MapServer/tile/{z}/{y}/{x}"
+REFERENCED_HOSTS = {"cdnjs.cloudflare.com", TILE_HOST, "www.esri.com", "www.openstreetmap.org", "opendatacommons.org"}
 
 
 @pytest.fixture(autouse=True)
@@ -497,8 +499,8 @@ class TestPageStructure:
 
     def test_the_map_is_set_up_as_the_design_says(self, script):
         assert re.search(r"setView\(\[25\.2, 55\.3\], 9\)", script)
-        assert "tile.openstreetmap.org/{z}/{x}/{y}.png" in script
-        assert "OpenStreetMap</a> contributors" in script and "ODbL" in script
+        assert TILE_URL in script  # Esri serves tiles as z/y/x, not z/x/y
+        assert "OpenStreetMap</a> contributors" in script and "ODbL" in script and "Esri</a>" in script
         assert "preferCanvas: true" in script
         assert "markerClusterGroup" in script
         # approximate pins stack on identical coordinates: only spiderfying separates them
@@ -522,12 +524,12 @@ class TestContentSecurityPolicy:
             if tag in order:
                 assert order.index(tag) > policy, tag
 
-    def test_it_allows_only_self_cdnjs_osm_tiles_and_fetch_to_self(self, parsed):
+    def test_it_allows_only_self_cdnjs_the_tile_host_and_fetch_to_self(self, parsed):
         csp = csp_directives(parsed)
         assert csp["default-src"] == ["'none'"]
         assert csp["connect-src"] == ["'self'"]
         assert csp["object-src"] == ["'none'"] and csp["base-uri"] == ["'none'"] and csp["form-action"] == ["'none'"]
-        assert set(csp["img-src"]) == {"'self'", "data:", "https://tile.openstreetmap.org"}
+        assert set(csp["img-src"]) == {"'self'", "data:", f"https://{TILE_HOST}"}
         for directive in ("script-src", "style-src"):
             sources = csp[directive]
             assert {"'self'", "https://cdnjs.cloudflare.com"} <= set(sources)
@@ -1508,8 +1510,9 @@ class TestPageWithData:
         assert out["mapOpts"]["preferCanvas"] is True
         assert "disableClusteringAtZoom" not in out["clusterOpts"] and out["clusterOpts"]["spiderfyOnMaxZoom"] is True
         (tile,) = out["tileLayers"]
-        assert tile["url"] == "https://tile.openstreetmap.org/{z}/{x}/{y}.png"
+        assert tile["url"] == TILE_URL
         assert "OpenStreetMap" in tile["opts"]["attribution"] and "ODbL" in tile["opts"]["attribution"] and "&copy;" in tile["opts"]["attribution"]
+        assert "Esri" in tile["opts"]["attribution"]
 
     def test_the_header_shows_counts_per_emirate_and_per_precision_from_the_meta_block(self, page):
         stats = page(sample_collection())["result"]["stats"]
