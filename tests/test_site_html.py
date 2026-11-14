@@ -1401,7 +1401,7 @@ function popupByName(name) {
   return null;
 }
 const helpers = {
-  byId: (id) => byId[id], LC, fetchLog, settle, snapshot, popupByName, rows, textOf, findAll, describe,
+  byId: (id) => byId[id], body, LC, fetchLog, settle, snapshot, popupByName, rows, textOf, findAll, describe,
   click: (e) => e.dispatch('click'),
   input: async (e, v) => { e.value = String(v); e.dispatch('input'); await settle(200); },
   change: async (e, v) => { e.value = String(v); e.dispatch('change'); await settle(5); },
@@ -1905,6 +1905,32 @@ class TestFailureAndEmptyStates:
             "h.click(t); const reopened = t.getAttribute('aria-expanded'); return [folded, reopened];"
         )
         assert page(sample_collection(), scenario=scenario, width=375)["result"] == ["false", "true"]
+
+    def test_on_a_phone_the_panel_starts_hidden_and_the_button_opens_it_as_a_drawer(self, page):
+        state = "const s = h.snapshot(); return [s.sideCollapsed, h.byId('toggleSide').getAttribute('aria-expanded'), h.byId('scrim').hidden];"
+        assert page(sample_collection(), scenario=state, width=375)["result"] == [True, "false", True]
+        assert page(sample_collection(), scenario=state, width=1200)["result"] == [False, "true", True]
+        opened = "h.click(h.byId('toggleSide')); " + state
+        assert page(sample_collection(), scenario=opened, width=375)["result"] == [False, "true", False]
+
+    @pytest.mark.parametrize(
+        "close",
+        [
+            "h.click(h.byId('closeSide'));",
+            "h.click(h.byId('scrim'));",
+            "h.body.dispatch('keydown', { key: 'Escape' });",
+        ],
+    )
+    def test_close_the_scrim_and_escape_each_hide_the_drawer_on_a_phone(self, page, close):
+        scenario = (
+            "h.click(h.byId('toggleSide')); const open = !h.snapshot().sideCollapsed; " + close +
+            " const s = h.snapshot(); return [open, s.sideCollapsed, h.byId('toggleSide').getAttribute('aria-expanded'), h.byId('scrim').hidden];"
+        )
+        assert page(sample_collection(), scenario=scenario, width=375)["result"] == [True, True, "false", True]
+
+    def test_escape_leaves_the_wide_screen_panel_alone(self, page):
+        scenario = "h.body.dispatch('keydown', { key: 'Escape' }); return h.snapshot().sideCollapsed;"
+        assert page(sample_collection(), scenario=scenario, width=1200)["result"] is False
 
     def test_the_panel_button_starts_out_as_expanded_and_points_at_the_panel(self, source):
         tag = re.search(r'<button[^>]*id="toggleSide"[^>]*>', source).group(0)

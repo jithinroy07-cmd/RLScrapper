@@ -10,7 +10,7 @@
   to paste in.
   img-src has data: because Leaflet swaps cancelled tiles for a one-pixel data image.
 -->
-<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'self' https://cdnjs.cloudflare.com 'sha256-H4fK17MWz4OgeW3E2yXNgriuuNV09pT453mxUMki3Cs='; style-src 'self' https://cdnjs.cloudflare.com 'sha256-AjNdKm962lR+1hWNcBA4e6LyJJ1WMRl4N+hSzTL9Lpc='; img-src 'self' data: https://server.arcgisonline.com; connect-src 'self'; base-uri 'none'; form-action 'none'; object-src 'none'">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'self' https://cdnjs.cloudflare.com 'sha256-K1uJvBqfV4THuWOCM547LgSDTStVSuwQf8xWzKEuz40='; style-src 'self' https://cdnjs.cloudflare.com 'sha256-uEMonIUX2x/WVwc6oz6hoicGvPpi9eMi6JPPCHBvCgo='; img-src 'self' data: https://server.arcgisonline.com; connect-src 'self'; base-uri 'none'; form-action 'none'; object-src 'none'">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>UAE Projects Map</title>
 <link rel="icon" href="data:,">
@@ -113,7 +113,7 @@
   .notice p + p { margin-top: 4px; }
 
   /* ---- body ---- */
-  .wrap { flex: 1; display: flex; min-height: 0; }
+  .wrap { flex: 1; display: flex; min-height: 0; position: relative; }
   .side {
     width: 380px; flex: none; display: flex; flex-direction: column; min-height: 0; overflow: auto;
     background: var(--surface); border-right: 1px solid var(--line);
@@ -179,15 +179,33 @@
   .marker-cluster { background: var(--radius-fill); }
   .centre-pin { background: var(--accent); border: 3px solid var(--marker-edge); border-radius: 50%; box-shadow: var(--shadow); }
   .picking .leaflet-container { cursor: crosshair; }
-  .toggle-side { display: none; }
+  /* The filters-and-list panel is a fixed column beside the map on a wide screen. On a phone it is a
+     drawer: hidden at first, slid in over the map by the floating button, and hidden again by its
+     Close button, the scrim behind it, the Escape key, or choosing a pin. */
+  .toggle-side, .side-head, .scrim { display: none; }
 
   @media (max-width: 760px) {
-    .wrap { flex-direction: column; }
-    .side { width: 100%; max-height: 46vh; border-right: 0; border-top: 1px solid var(--line); order: 2; }
-    .side.collapsed { max-height: 0; overflow: hidden; border: 0; visibility: hidden; }
-    #map { order: 1; min-height: 40vh; }
-    .toggle-side { display: inline-block; }
-    .stats { width: 100%; }
+    #map { flex: 1; min-width: 0; }
+    .side {
+      position: absolute; top: 0; bottom: 0; left: 0; z-index: 1100; width: min(86vw, 380px);
+      box-shadow: var(--shadow); transition: transform .2s ease, visibility .2s;
+      padding-bottom: env(safe-area-inset-bottom, 0px);
+    }
+    .side.collapsed { transform: translateX(-105%); visibility: hidden; }
+    .side-head {
+      display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 10px 16px;
+      border-bottom: 1px solid var(--line); font-weight: 600; position: sticky; top: 0; background: var(--surface); z-index: 1;
+    }
+    .scrim { display: block; position: absolute; inset: 0; z-index: 1090; background: rgba(0, 0, 0, .4); border: 0; margin: 0; padding: 0; }
+    .toggle-side {
+      display: inline-flex; position: absolute; top: 12px; right: 12px; z-index: 1080;
+      padding: 10px 14px; font-weight: 600; white-space: nowrap; box-shadow: var(--shadow);
+    }
+    .side:not(.collapsed) ~ .toggle-side { visibility: hidden; }  /* the open drawer replaces the button */
+    /* Header on a phone: the title and Refresh share the first line; the counts wrap underneath. */
+    .top { gap: 8px 14px; }
+    #reload { order: 2; }
+    .stats { order: 3; width: 100%; }
   }
   @media (prefers-reduced-motion: reduce) { * { transition: none !important; animation: none !important; } }
 </style>
@@ -200,13 +218,16 @@
     <span class="sub">Dubai and Sharjah</span>
   </div>
   <div class="stats" id="stats" aria-live="polite">Loading pins&hellip;</div>
-  <button class="btn toggle-side" id="toggleSide" type="button" aria-expanded="true" aria-controls="side">Filters &amp; list</button>
   <button class="btn" id="reload" type="button">Refresh</button>
 </div>
 <div class="notice" id="notice" hidden></div>
 
 <div class="wrap">
   <aside class="side" id="side" aria-label="Filters and results">
+    <div class="side-head">
+      <span>Filters &amp; list</span>
+      <button class="btn" id="closeSide" type="button" aria-label="Hide the filters and list">Close</button>
+    </div>
     <section>
       <label class="lbl" for="q">Search</label>
       <input class="search" id="q" type="search" placeholder="Project, developer or registry number" autocomplete="off">
@@ -271,6 +292,8 @@
     <div class="credits" id="credits"></div>
   </aside>
   <div id="map" role="application" aria-label="Map of Dubai and Sharjah projects. The list in the side panel has the same projects."></div>
+  <div class="scrim" id="scrim" hidden></div>
+  <button class="btn toggle-side" id="toggleSide" type="button" aria-expanded="true" aria-controls="side">Filters &amp; list</button>
 </div>
 <noscript><div class="notice error">This map needs JavaScript. Without it nothing can be drawn.</div></noscript>
 
@@ -598,7 +621,7 @@
     priceLabel: $('priceLabel'), priceCov: $('priceCov'), pick: $('pick'), clear: $('clearRadius'),
     radius: $('radius'), radiusLabel: $('radiusLabel'), radiusNote: $('radiusNote'),
     header: $('resultsHeader'), list: $('list'), credits: $('credits'), side: $('side'),
-    toggle: $('toggleSide'), reload: $('reload'), reset: $('resetFilters')
+    toggle: $('toggleSide'), closeSide: $('closeSide'), scrim: $('scrim'), reload: $('reload'), reset: $('resetFilters')
   };
 
   var MAX_LIST_ROWS = 300;
@@ -879,12 +902,20 @@
     var first = pin.priceFrom !== null ? pin.priceFrom : pin.priceTo;
     return first === null ? '' : (pin.priceFrom !== null ? 'from ' : 'up to ') + formatAed(first);
   }
-  // On a phone the panel covers the map; folding it away resizes the map, which Leaflet has to be told
-  // about (invalidateSize) before it centres on anything, or the target lands off-centre.
+  // On a phone the panel is a drawer over the map (the CSS media query at 760px decides). It starts
+  // hidden; the floating button opens it, and Close, the scrim, Escape or choosing a pin hides it.
+  function isPhone() { return window.innerWidth <= 760; }
+  function setSide(open) {
+    els.side.classList.toggle('collapsed', !open);
+    els.toggle.setAttribute('aria-expanded', open ? 'true' : 'false');
+    els.scrim.hidden = !(open && isPhone());
+  }
+  function sideIsOpen() { return !els.side.classList.contains('collapsed'); }
+  // Folding the drawer away before the map moves: Leaflet is told about any size change (invalidateSize)
+  // before it centres on anything, or the target could land off-centre.
   function collapsePanelOnPhone() {
-    if (window.innerWidth > 760) return;
-    els.side.classList.add('collapsed');
-    els.toggle.setAttribute('aria-expanded', 'false');
+    if (!isPhone()) return;
+    setSide(false);
     map.invalidateSize();
   }
   var focusSeq = 0;
@@ -1107,10 +1138,23 @@
       if (circle) { circle.setRadius(radiusKm * 1000); render(); }
     });
     els.toggle.addEventListener('click', function () {
-      var collapsed = els.side.classList.toggle('collapsed');
-      els.toggle.setAttribute('aria-expanded', collapsed ? 'false' : 'true');
-      setTimeout(function () { map.invalidateSize(); }, 50);
+      setSide(!sideIsOpen());
+      if (sideIsOpen() && typeof els.closeSide.focus === 'function') els.closeSide.focus();
+      setTimeout(function () { map.invalidateSize(); }, 250);
     });
+    function hideSide() {
+      setSide(false);
+      if (typeof els.toggle.focus === 'function') els.toggle.focus();
+    }
+    els.closeSide.addEventListener('click', hideSide);
+    els.scrim.addEventListener('click', hideSide);
+    document.body.addEventListener('keydown', function (e) {
+      if (e.key === 'Escape' && isPhone() && sideIsOpen()) hideSide();
+    });
+    if (typeof window.addEventListener === 'function') {
+      window.addEventListener('resize', function () { els.scrim.hidden = !(sideIsOpen() && isPhone()); });
+    }
+    setSide(!isPhone());  // the drawer starts hidden on a phone; the panel is always shown on a wide screen
     els.reload.addEventListener('click', load);
     els.reset.addEventListener('click', function () { resetRadius(); buildControls(); render(); });
     if (window.matchMedia) {
