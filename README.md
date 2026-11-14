@@ -139,6 +139,10 @@ DATA_DUBAI_PROJECTS_FILE=<path to the downloaded .json file>
 
 Put that line in `.env` (never in a repository variable; the workflow does not pass it), then `python -m src.main --dry-run` to read the counts, then `python -m src.main`. The adapter reads the file through the same schema check, row mapping and unusable-row guards as the API path, makes no request, stamps the rows' `Source Dataset` with the dataset page and takes the refresh date from the rows' `load_timestamp`. The 28 October 2026 download holds 3481 rows, of which 3479 map (two have no name), every one keyed by its project number. The file is registry data, so keep it outside the repository or under a git-ignored path (`backups/` is ignored) and never commit it: the data licence is unclarified ("Open decisions"). If the API key and secret are set as well, the file still wins and the run says so. The daily run cannot do this for you, so the register is only as fresh as your last download until the key arrives.
 
+## Drafting the Sharjah seed from the SRERD list
+
+The Sharjah list cannot feed the registry by itself (no id, no developer; see "What is real today"), but it is the right source of names and areas for the seed file. `python -m scripts.draft_sharjah_seed` fetches the list once and writes `sharjah_seed_draft.csv` in your home folder (`--out PATH` for elsewhere): the seed layout with `Emirate`, `Area (EN)` and `Source URL` (the list's page) filled in, the English name where the list has one, and two reference-only columns with the Arabic name and the ownership type. A person fills in `Developer` for each row, adds the English name where it is blank, and pastes the complete rows into `src/data/seed_registry.csv`, dropping the two reference columns. Rows without a developer are not worth pasting: the loader drops them. The tool prints counts only and writes outside the repository, because the draft is not something to commit.
+
 ## Cleaning up duplicate rows
 
 `scripts/dedupe_sheet.py` merges duplicate rows in the `Registry_Projects` tab, for example a hand-entered seed row and the registry row for the same project. It uses the same matching and merging rules as the daily run, and it never touches another tab.
@@ -210,6 +214,7 @@ scripts/
   dedupe_sheet.py      clean-up tool described above
   export_map_pins.py   builds site/pins.geojson
   fetch_emirate_polygons.py   one-off helper that refreshes the bundled boundaries
+  draft_sharjah_seed.py       writes a draft of Sharjah seed rows from the SRERD list, for a person to complete
 site/                  the map page
 tests/                 the test suite (invented projects, keys and rows; it also reads the bundled boundary file and a table of public place coordinates)
 docs/                  design contract and research notes

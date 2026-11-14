@@ -32,6 +32,9 @@ src/data/geocode_cache.json
 
 # Sheet backups written by scripts/dedupe_sheet.py (contain live sheet data)
 backups/
+# Draft seed rows written by scripts/draft_sharjah_seed.py (a person completes them, then pastes
+# the finished rows into src/data/seed_registry.csv; the draft itself is never committed)
+sharjah_seed_draft*.csv
 
 # Generated each run
 site/pins.geojson
